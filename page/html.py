@@ -16,7 +16,7 @@ class Html:
 			value = get_text(attr.value)
 
 			if name == "style":
-				for kv in value.split(";"):
+				for kv in value.strip().strip(";").split(";"):
 					sk, sv = kv.split(":", 1)
 					style[sk.strip()] = sv.strip()
 			else:
