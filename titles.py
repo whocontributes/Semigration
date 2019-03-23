@@ -4,13 +4,57 @@ import glob
 import logging
 import argparse
 
-import page
+import semigration as smg
 
 class MultiBreak(Exception): pass
 
+
+# You'll want to normalize common things that may have varying spellings etc.
 EFFECT_MAP = {
+	"hp": "Max HP",
+	"maxhp": "Max HP",
+	"max life": "Max HP",
+	"mp": "Max MP",
+	"maxmp": "Max MP",
+	"max mana": "Max MP",
+	"sp": "Max Stamina",
+	"maxsp": "Max Stamina",
+	"max sp": "Max Stamina",
+	"stamina": "Max Stamina",
+
+	"str": "Strength",
+	"max str": "Strength",
 	"int": "Intelligence",
+	"max int": "Intelligence",
+	"dex": "Dexterity",
+	"max dex": "Dexterity",
+	"max will": "Will",
+	"max luck": "Luck",
+
+	"def": "Defense",
+	"prot": "Protection",
+
+	"critical": "Critical",
+	"magic damage": "Magic Attack",
+	"maximum damage": "Max Damage",
+
+	"magic protection": "Magic Protection",
+
+	"combat exp": "Combat EXP",
+	"movement speed": "Movement Speed",
+	"gathering speed": "Gathering Speed",
+	"gathering success rate": "Gathering Success Rate",
+	"music buff effect": "Music Buff Effect",
+
+	"crystal making success": "Mana Crystallization Success Rate",
+	"synthesis success": "Synthesis Success Rate",
+	"fragmentation success": "Fragmentation Success Rate",
+	"water-type alchemy damage": "Water Alchemy Damage",
+	"fire-type alchemy damage": "Fire Alchemy Damage",
 }
+
+for x in list(EFFECT_MAP.values()):
+	EFFECT_MAP[x.lower()] = x
 
 
 SPLITTER = re.compile(r'(?<=[\d%]),')
@@ -24,15 +68,24 @@ def split_effects(text, effects, effect_type):
 				print(f"  Weird effect: '{effect}'")
 			continue
 		name, value = effect.rsplit(maxsplit=1)
+		name = name.strip()
+		lower_name = name.lower()
+
+		if lower_name in EFFECT_MAP:
+			normal_name = EFFECT_MAP[lower_name]
+		else:
+			print(f"  Unknown or unique effect: {name}")
+			normal_name = name
+
 		effects.append({
-			"titleStat": name.strip(),
+			"titleStat": normal_name,
 			"titleStatAmount": value.strip(),
 			"titleStatType": effect_type,
 		})
 
 
 def download(filename):
-	titles = page.parse("Titles")
+	titles = smg.parse("Titles")
 	with open(filename, "w", encoding="utf8") as f:
 		f.write(titles.text())
 	return titles
@@ -40,7 +93,7 @@ def download(filename):
 
 def load(filename):
 	with open(filename, encoding="utf8") as f:
-		return page.parse(text=f.read())["Titles"]
+		return smg.parse(text=f.read())["Titles"]
 
 
 def process(titles, folder):
@@ -49,13 +102,13 @@ def process(titles, folder):
 	general = titles["General Titles"]
 
 	for tp_idx, tp in enumerate(general.get_templates("TitleTable")):
-		name = page.get_text(tp["name"]).strip()
+		name = smg.get_text(tp["name"]).strip()
 		print(f"Processing: {name}")
 		try:
 			effects = []
 			notes = ""
 			try:
-				effects_text = page.get_text(tp["effects"]).strip()
+				effects_text = smg.get_text(tp["effects"]).strip()
 			except KeyError:
 				effects_text = "?"
 
@@ -70,19 +123,21 @@ def process(titles, folder):
 			else:
 				try:
 					for effect_tag in tp["effects"].filter_tags(recursive=False):
-						html = page.Html(effect_tag)
+						html = smg.Html(effect_tag)
 						if html.tag == "span":
-							if html.style.color == page.color.red:
+							if html.style.color == smg.color.red:
 								effect_type = "Negative"
-							elif html.style.color == page.color.blue:
+							elif html.style.color == smg.color.blue:
 								effect_type = "Positive"
 							else:
 								raise MultiBreak("  Unknown span in effects, skipping")
 
-							text = ", ".join(page.get_text(x) for x in html.contents.filter_text(recursive=False))
+							# Effects seem to be split by both , and <br/> so normalizing to commas.
+							text = ", ".join(smg.get_text(x) for x in html.contents.filter_text(recursive=False))
 
 							split_effects(text, effects, effect_type)
 
+						# MediaWiki text formatting is picked up here, too, '' -> i
 						elif html.tag == "i":
 							notes = html.text.lstrip("(").rstrip(")")
 							
@@ -90,13 +145,13 @@ def process(titles, folder):
 							raise MultiBreak(f"  Unknown html tag '{html.tag}', skipping")
 
 					for effect_text in tp["effects"].filter_text(recursive=False):
-						text = page.get_text(effect_text).strip()
+						text = smg.get_text(effect_text).strip()
 						if text:
 							split_effects(text, effects, effect_type)
 				except MultiBreak as err:
 					logging.warning(err.args[0])
 
-			number = page.get_text(tp["#"]).strip()
+			number = smg.get_text(tp["#"]).strip()
 			try:
 				if int(number) > 100:
 					number= "*"
@@ -106,9 +161,9 @@ def process(titles, folder):
 			# TODO: hint [html] comments
 
 			filename = f"{tp_idx:03d}-{name}.mediawiki"
-			cleaned_filename = page.clean_filename(filename)
+			cleaned_filename = smg.clean_filename(filename)
 			if filename != cleaned_filename:
-				cleaned_filename = page.clean_filename(f"{tp_idx:03d}-{name}.badname.mediawiki")
+				cleaned_filename = smg.clean_filename(f"{tp_idx:03d}-{name}.badname.mediawiki")
 
 			with open(os.path.join(folder, cleaned_filename), "w", encoding="utf8") as f:
 				f.write("\n".join((
@@ -116,7 +171,13 @@ def process(titles, folder):
 					f"|titleNumber={number}",
 					f"|titleName={name}",
 					*(
-						"|{}={}".format(to_param, page.get_text(tp.get(from_param, "(unknown)")).strip())
+						"|{}={}".format(
+							to_param,
+							smg.get_text(
+								tp.get(from_param, "(unknown)"),
+								str
+							).strip()
+						)
 						for from_param, to_param in [
 							("hint", "titleHintDescription"),
 							("hintreq", "titleHintRequirement"),
@@ -151,22 +212,26 @@ def upload(folder):
 		"suggest": 'Enter a new name or leave blank to use "{name}"',
 		"enter": "Enter the title (or a 2 or 3 for gendered titles)",
 		"enter1/1": "Enter title:",
-		"enter1/3": "Enter neuter title:",
-		"enter2/3": "Enter male title:",
-		"enter3/3": "Enter female title:",
-		"enter1/2": "Enter male title:",
-		"enter2/2": "Enter female title:",
+		"enter1/3": "Enter neuter title",
+		"enter2/3": "Enter male title",
+		"enter3/3": "Enter female title",
+		"enter1/2": "Enter male title",
+		"enter2/2": "Enter female title",
 	}
 	for file in glob.glob(os.path.join(folder, "**.mediawiki")):
 		name = os.path.basename(file)[4:-10]
 		with open(file) as f:
 			contents = f.read()
 		if name.endswith(".badname"):
-			page.upload(name, contents, text, bad=True)
+			smg.upload(name, contents, text, bad=True)
 		else:
-			page.upload(name, contents, text)
+			smg.upload(name, contents, text)
 
 
+# It's a good idea to separate things into steps in case one part breaks.
+# Here, I've made separate download, processing, and upload steps.
+# It would be fair to combine download and processing if you trust the download code.
+# Having it separated mainly allows me to dev this without Wi-Fi.
 parser = argparse.ArgumentParser(description="Migrated general titles")
 parser.add_argument("-d", "--download", action="store_true",
 	help="Download the titles page, process it, and write it out.")
