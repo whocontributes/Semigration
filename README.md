@@ -6,5 +6,4 @@ titles.py is meant to serve as a bare-bones example usage. I will probably conti
 TODO:
 
 * Download templates linked in a page more easily.
-* Interactive version which opens the target page in your browser and copies the staged data to clipboard
 * Simple way to check if a property value has been used before (for stats)

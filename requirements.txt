@@ -1,2 +1,4 @@
 mwclient
 mwparserfromhell
+clipboard
+pyreadline
