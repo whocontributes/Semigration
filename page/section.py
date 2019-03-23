@@ -9,9 +9,10 @@ URL_WIKI_BASE = "wiki.mabinogiworld.com"
 URL_WIKI_PATH = "/"
 
 
-def parse(page):
-	site = mwclient.Site(URL_WIKI_BASE, URL_WIKI_PATH)
-	text = site.pages[page].text()
+def parse(page=None, *, text=None):
+	if text is None:
+		site = mwclient.Site(URL_WIKI_BASE, URL_WIKI_PATH)
+		text = site.pages[page].text()
 
 	parsed = mwparserfromhell.parse(text)
 
@@ -57,6 +58,15 @@ class Section:
 			for tp in self.templates
 			if tp.name == template_name
 		]
+
+	def text(self, level=1):
+		eq = "=" * level
+		return "\n".join((
+			f"{eq} {self.title} {eq}",
+			*(str(tp._src) for tp in self.templates),
+			*(head.text(level + 1) for head in self.headers.values()),
+		))
+
 
 
 class Template(OrderedDict):
