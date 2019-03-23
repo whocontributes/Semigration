@@ -81,14 +81,14 @@ def input_name(blank_invalid, text):
 		msg = localize("enter", text)
 		name = input(f"  {msg}: ")
 		try:
-			num = int(name)
+			num = int(name) + 1
 		except ValueError:
 			namespace, cleaned = clean_name(name)
 			if cleaned is not None and (not blank_invalid or cleaned):
 				return add_ns(namespace, cleaned), [url_safe(namespace, cleaned)]
 			print("Name is invalid.")
 		else:
-			i = 0
+			i = 1
 			names = []
 			while i < num:
 				msg = localize(f"enter{i}/{num}", text)
