@@ -35,6 +35,15 @@ def parse(page=None, *, text=None):
 	return root
 
 
+def download(pages):
+	root = Section("Batch")
+
+	for page in pages:
+		root.headers[page] = parse(page)
+
+	return root
+
+
 class Section:
 	def __init__(self, title):
 		self.title = title
@@ -52,11 +61,24 @@ class Section:
 	def __getitem__(self, key):
 		return self.headers[key]
 
-	def get_templates(self, template_name):
+	def get_templates(
+		self, *,
+		name=None,
+		params={},
+		default=None,
+	):
 		return [
 			tp
 			for tp in self.templates
-			if tp.name == template_name
+			if (
+				(name is None or tp.name == name) and
+				(params is None or all(
+					p in tp and (lambda x: x in v if isinstance(v, (list, tuple)) else x == v)(
+						get_text(tp[p], default).strip()
+					)
+					for p, v in params.items()
+				))
+			)
 		]
 
 	def text(self, level=1):
@@ -68,12 +90,11 @@ class Section:
 		))
 
 
-
 class Template(OrderedDict):
 	def __init__(self, template):
 		OrderedDict.__init__(self, {})
 		self._src = template
-		self.name = get_text(template.name).strip()
+		self.name = get_text(template.name, str).strip()
 
 		for param in template.params:
 			key = get_text(param.name).strip()
@@ -81,3 +102,6 @@ class Template(OrderedDict):
 
 	def text(self, key):
 		return get_text(self[key]).strip()
+
+	def __repr__(self):
+		return f"{self.__class__.__name__}({repr(self.name)}, [{', '.join(repr(s) for s in self.items())}])"
