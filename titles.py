@@ -101,7 +101,7 @@ def process(titles, folder):
 
 	general = titles["General Titles"]
 
-	for tp_idx, tp in enumerate(general.get_templates("TitleTable")):
+	for tp_idx, tp in enumerate(general.get_templates(name="TitleTable")):
 		name = smg.get_text(tp["name"]).strip()
 		print(f"Processing: {name}")
 		try:
@@ -173,10 +173,7 @@ def process(titles, folder):
 					*(
 						"|{}={}".format(
 							to_param,
-							smg.get_text(
-								tp.get(from_param, "(unknown)"),
-								str
-							).strip()
+							str(tp.get(from_param, "(unknown)")).strip(),
 						)
 						for from_param, to_param in [
 							("hint", "titleHintDescription"),
@@ -206,26 +203,27 @@ def process(titles, folder):
 			logging.exception(err)
 
 
-def upload(folder):
+def upload(folder, continue_from):
 	text = {
 		"badname": "Unable to use given page name, please enter a new one.\n  Invalid name: {name}",
 		"suggest": 'Enter a new name or leave blank to use "{name}"',
-		"enter": "Enter the title (or a 2 or 3 for gendered titles)",
+		"enter": "Enter the title (or a 3 for gendered titles)",
 		"enter1/1": "Enter title:",
-		"enter1/3": "Enter neuter title",
+		"enter1/3": "Enter neuter title (what's in the selection list)",
 		"enter2/3": "Enter male title",
 		"enter3/3": "Enter female title",
-		"enter1/2": "Enter male title",
-		"enter2/2": "Enter female title",
 	}
 	for file in glob.glob(os.path.join(folder, "**.mediawiki")):
-		name = os.path.basename(file)[4:-10]
-		with open(file) as f:
-			contents = f.read()
-		if name.endswith(".badname"):
-			smg.upload(name, contents, text, bad=True)
-		else:
-			smg.upload(name, contents, text)
+		basename = os.path.basename(file)
+		num = int(basename[:3])
+		if num >= continue_from:
+			name = basename[4:-10]
+			with open(file) as f:
+				contents = f.read()
+			if name.endswith(".badname"):
+				smg.upload(name, contents, text, bad=True)
+			else:
+				smg.upload(name, contents, text)
 
 
 # It's a good idea to separate things into steps in case one part breaks.
@@ -241,6 +239,8 @@ parser.add_argument("-p", "--process", action="store_true",
 	help="Process a downloaded page. (Default: titles.mediawiki)")
 parser.add_argument("-u", "--upload", action="store_true",
 	help="Upload the already downloaded titles to semantic spaces.")
+parser.add_argument("-c", "--continue-from", default=0,
+	help="Continue uploading from a certain file (by number).")
 parser.add_argument("-f", "--folder", default="general_titles",
 	help="Specify the folder to dump titles into. (Default: general_titles)")
 parser.add_argument("file", nargs="?", default="titles.mediawiki",
@@ -257,4 +257,4 @@ elif args.process:
 	process(titles, args.folder)
 
 if args.upload:
-	upload(args.folder)
+	upload(args.folder, int(args.continue_from))
