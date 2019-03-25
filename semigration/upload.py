@@ -52,6 +52,7 @@ def upload(name, contents, text={}, bad=False):
 	if main_name:
 		safe_main_name = names.pop(0)
 	else:
+		names.pop(0)  # pop off blank string
 		main_name = add_ns(namespace, cleaned)
 		safe_main_name = url_safe(namespace, cleaned)
 
@@ -81,7 +82,7 @@ def input_name(blank_invalid, text):
 		msg = localize("enter", text)
 		name = input(f"  {msg}: ")
 		try:
-			num = int(name) + 1
+			num = int(name)
 		except ValueError:
 			namespace, cleaned = clean_name(name)
 			if cleaned is not None and (not blank_invalid or cleaned):
@@ -90,12 +91,12 @@ def input_name(blank_invalid, text):
 		else:
 			i = 1
 			names = []
-			while i < num:
+			while i <= num:
 				msg = localize(f"enter{i}/{num}", text)
 				name = input(f"  {msg}: ")
 				namespace, cleaned = clean_name(name)
 				if cleaned is not None and (not blank_invalid or cleaned):
-					if i == 0:
+					if i == 1:
 						main_name = add_ns(namespace, cleaned)
 					names.append(url_safe(namespace, cleaned))
 					i += 1
