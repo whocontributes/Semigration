@@ -8,6 +8,7 @@ import mwclient
 import mwparserfromhell
 
 from Monster_Globals import SKILL_BLACKLIST, VALID_SKILLS, CAPITIAL_EACH_WORD, FAMILY_PAGES_LIST
+from Monster_Params_Parser import make_monster_difficulty
 
 import semigration
 from semigration.section import URL_WIKI_BASE, URL_WIKI_PATH
@@ -30,13 +31,6 @@ from semigration.upload import URL_EDIT
 #             Ask the user if they want to upload code to wiki or save to good/bad. Cutoff is 70% matching
 #   b. upload_listdir("good") After reviewing the old and new, this function will loop through the good directory and upload to wiki
 
-# https://stackoverflow.com/a/46516776
-def try_or(fn, default):
-	try:
-		return fn()
-	except:
-		return default
-
 
 def myupload(name, contents):
 	clipboard.copy(contents)
@@ -56,9 +50,16 @@ def extract_templates(page=None, *, text=None):
 
 
 ###############
-# Processes the parameters, Page-> Family, Skills, CP, Capitals, FieldBox or Mainstream
+# Processes the parameters,
+# Page-> Family,
+# Skills,
+# CP,
+# Capitals,
+# FieldBox or Mainstream
+# Aggro -> true or false
+# Element: Unknown -> empty string
 ###############
-def process_params_pages_skills_cp_capital_fieldboss_mainstream_section(wikicode, monster_type, section):
+def process_common_params(wikicode, monster_type, section):
 	params_list = wikicode.params
 	params_to_remove = []
 	skills_list = []
@@ -92,6 +93,9 @@ def process_params_pages_skills_cp_capital_fieldboss_mainstream_section(wikicode
 				param.value = "true\n"  # set aggro to true
 			else:
 				param.value = "false\n"
+		elif param.name == "Element":
+			if param.value.strip().lower() == "Unknown":
+				param.value = "\n"
 
 	for param in params_to_remove:
 		params_list.remove(param)  # remove since we are going for list approach on skills
@@ -114,106 +118,6 @@ def get_ready_wikicode(wikicode):
 	new_string = "{{SemanticMonsterData" + string[i:]
 	return mwparserfromhell.parse(new_string)
 
-
-###############
-# Manually adds data for {{SemanticMonsterDifficultyData template
-###############
-def make_monster_difficulty(wikicode, monster_type):
-	difficulty_template = mwparserfromhell.parse("{{SemanticMonsterDifficultyData\n}}").filter_templates()[0]
-	if monster_type == "Normal":
-		dungeon = try_or(lambda: wikicode.get("DungeonLocations").value, "")
-		field = try_or(lambda: wikicode.get("FieldLocations").value, "")
-
-		difficulty_template.add("Locations", str(dungeon).replace("*None", "") + str(field).replace("*None", "") + "\n")
-
-		difficulty_template.add("Difficulty", "\n")
-
-		# first, move all values to difficulty_template
-		difficulty_template.add("HP", try_or(lambda: wikicode.get("HP").value, "\n"))
-		difficulty_template.add("CP", try_or(lambda: wikicode.get("CP").value, "\n"))
-		difficulty_template.add("Defense", try_or(lambda: wikicode.get("Defense").value, "\n"))
-		difficulty_template.add("Protection", try_or(lambda: wikicode.get("Protection").value, "\n"))
-		difficulty_template.add("MeleeDamage", try_or(lambda: wikicode.get("MeleeDamage").value, "\n"))
-		difficulty_template.add("RangedDamage", try_or(lambda: wikicode.get("RangedDamage").value, "\n"))
-
-		difficulty_template.add("MonsterCrit", try_or(lambda: wikicode.get("MonsterCrit").value, "\n"))
-		difficulty_template.add("EXP", try_or(lambda: wikicode.get("EXP").value, "\n"))
-		difficulty_template.add("Gold", try_or(lambda: wikicode.get("Gold").value, "\n"))
-		difficulty_template.add("DropEquip", try_or(lambda: wikicode.get("DropEquip").value, "\n"))
-		difficulty_template.add("DropMisc", try_or(lambda: wikicode.get("DropMisc").value, "\n"))
-
-		# Then remove original values
-		try_or(lambda: wikicode.remove("HP"), "")
-		try_or(lambda: wikicode.remove("CP"), "")
-		try_or(lambda: wikicode.remove("Defense"), "")
-		try_or(lambda: wikicode.remove("Protection"), "")
-		try_or(lambda: wikicode.remove("MeleeDamage"), "")
-		try_or(lambda: wikicode.remove("RangedDamage"), "")
-
-		try_or(lambda: wikicode.remove("MonsterCrit"), "")
-		try_or(lambda: wikicode.remove("EXP"), "")
-		try_or(lambda: wikicode.remove("Gold"), "")
-		try_or(lambda: wikicode.remove("DropEquip"), "")
-		try_or(lambda: wikicode.remove("DropMisc"), "")
-
-		try_or(lambda: wikicode.remove("DungeonLocations"), "")
-		try_or(lambda: wikicode.remove("FieldLocations"), "")
-
-	if monster_type == "Shadow":
-		wikicode, difficulty_template = process_params_shadow(wikicode)
-	return mwparserfromhell.parse(
-		re.sub(r'[\n]{2,}', '\n', str(wikicode)) + "<nowiki/>\n" + re.sub(r'[\n]{2,}', '\n', str(difficulty_template)))
-
-
-###############
-# Manually adds data for {{SemanticMonsterDifficultyData template for shadow monsters
-###############
-def process_params_shadow(wikicode):
-	difficulty_total = ""
-	params_list = wikicode.params
-
-	for param in params_list:
-		if "Mission" in param.name:  # change Mission to MissionsList
-			param.name = "MissionsList"
-		elif "AllDropMisc" in param.name:
-			param.name = "DropMiscCommon"
-		elif "AllDropEquip" in param.name:
-			param.name = "DropEquipCommon"
-
-	for diff in ["Basic", "Intermediate", "Advanced", "Hard", "Elite"]:
-		difficulty_template = mwparserfromhell.parse("{{SemanticMonsterDifficultyData\n}}").filter_templates()[0]
-
-		difficulty_template.add("Difficulty", diff + "\n")
-
-		# first, move all values to difficulty_template
-		difficulty_template.add(diff + "HP", try_or(lambda: wikicode.get(diff + "HP").value, "\n"))
-		difficulty_template.add(diff + "CP", try_or(lambda: wikicode.get(diff + "CP").value, "\n"))
-		difficulty_template.add(diff + "Defense", try_or(lambda: wikicode.get(diff + "Defense").value, "\n"))
-		difficulty_template.add(diff + "Protection", try_or(lambda: wikicode.get(diff + "Protection").value, "\n"))
-		difficulty_template.add(diff + "MeleeDamage", try_or(lambda: wikicode.get(diff + "MeleeDamage").value, "\n"))
-		difficulty_template.add(diff + "RangedDamage", try_or(lambda: wikicode.get(diff + "RangedDamage").value, "\n"))
-
-		difficulty_template.add(diff + "Crit", try_or(lambda: wikicode.get(diff + "Crit").value, "\n"))
-		difficulty_template.add(diff + "EXP", try_or(lambda: wikicode.get(diff + "EXP").value, "\n"))
-		difficulty_template.add(diff + "Gold", try_or(lambda: wikicode.get(diff + "Gold").value, "\n"))
-		difficulty_template.add(diff + "DropEquip", try_or(lambda: wikicode.get(diff + "DropEquip").value, "\n"))
-		difficulty_template.add(diff + "DropMisc", try_or(lambda: wikicode.get(diff + "DropMisc").value, "\n"))
-
-		# Then remove original values
-		try_or(lambda: wikicode.remove(diff + "HP"), "")
-		try_or(lambda: wikicode.remove(diff + "CP"), "")
-		try_or(lambda: wikicode.remove(diff + "Defense"), "")
-		try_or(lambda: wikicode.remove(diff + "Protection"), "")
-		try_or(lambda: wikicode.remove(diff + "MeleeDamage"), "")
-		try_or(lambda: wikicode.remove(diff + "RangedDamage"), "")
-
-		try_or(lambda: wikicode.remove(diff + "Crit"), "")
-		try_or(lambda: wikicode.remove(diff + "EXP"), "")
-		try_or(lambda: wikicode.remove(diff + "Gold"), "")
-		try_or(lambda: wikicode.remove(diff + "DropEquip"), "")
-		try_or(lambda: wikicode.remove(diff + "DropMisc"), "")
-		difficulty_total = difficulty_total + str(difficulty_template) + "<nowiki/>\n"
-	return wikicode, difficulty_total
 
 def write_files_or_upload(current_monster_name, ready_wikicode):
 	value = ""
@@ -248,8 +152,6 @@ def preprocess_pages():
 					monster_type = "Normal"
 					if "StyleShadowMonster" in str(item['format']):
 						monster_type = "Shadow"
-					elif "StyleLordMonster" in str(item['format']):
-						monster_type = "Lord"
 					elif "StyleFinnachaidMonster" in str(item['format']):
 						monster_type = "Sidhe"
 					elif "StyleBandit" in str(item['format']):
@@ -266,13 +168,19 @@ def preprocess_pages():
 					current_monster_name = str(item.name).replace("DataMonster", "")
 					current_data_monster_templates_list = extract_templates("Template:" + str(item.name))
 
+					if monster_type == "Shadow" and "Lord" in str(current_data_monster_templates_list):
+						print("[WARNING] Lord monster detected. Please confirm output.")
+						monster_type = "Lord"
+					else:
+						monster_type = "Shadow"
+
 					param_done_wikicode = ""
 					indexes_to_delete = []
 					# Now we search for the {{{format}}} template
 					for i, wikicode in enumerate(current_data_monster_templates_list):
 						if "{{{format" in str(wikicode.name):
 							orig_wikicode = str(wikicode)
-							param_done_wikicode = process_params_pages_skills_cp_capital_fieldboss_mainstream_section(
+							param_done_wikicode = process_common_params(
 								wikicode, monster_type, section)
 						else:
 							indexes_to_delete.append(i)
