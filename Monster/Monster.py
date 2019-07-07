@@ -1,13 +1,15 @@
 # whocontributes 07/04/2019
 import difflib
+import re
 import webbrowser
-from difflib import SequenceMatcher
 
 import clipboard
 import mwclient
 import mwparserfromhell
 
 from Monster_Globals import SKILL_BLACKLIST, VALID_SKILLS, CAPITIAL_EACH_WORD, FAMILY_PAGES_LIST
+
+import semigration
 from semigration.section import URL_WIKI_BASE, URL_WIKI_PATH
 from semigration.upload import URL_EDIT
 
@@ -27,9 +29,13 @@ from semigration.upload import URL_EDIT
 #         f. Call write_files_or_upload()
 #             Ask the user if they want to upload code to wiki or save to good/bad. Cutoff is 70% matching
 #   b. upload_listdir("good") After reviewing the old and new, this function will loop through the good directory and upload to wiki
-# https://stackoverflow.com/a/17388505
-def similar(a, b):
-	return SequenceMatcher(None, a, b).ratio()
+
+# https://stackoverflow.com/a/46516776
+def try_or(fn, default):
+	try:
+		return fn()
+	except:
+		return default
 
 
 def myupload(name, contents):
@@ -50,9 +56,9 @@ def extract_templates(page=None, *, text=None):
 
 
 ###############
-# Processes the parameters in a page
+# Processes the parameters, Page-> Family, Skills, CP, Capitals, FieldBox or Mainstream
 ###############
-def process_params(wikicode):
+def process_params_pages_skills_cp_capital_fieldboss_mainstream_section(wikicode, monster_type, section):
 	params_list = wikicode.params
 	params_to_remove = []
 	skills_list = []
@@ -77,16 +83,22 @@ def process_params(wikicode):
 				param.value = "\n"
 		elif any(name in param.name for name in CAPITIAL_EACH_WORD):  # Capitalize each word
 			param.value = param.value.title()
-		elif "FieldBoss" in param.name or "Mainstream" in param.name:  # set FieldBoss and Mainstream to "true" or "false"
+		elif "FieldBoss" in param.name or "Mainstream" in param.name:
+			params_to_remove.append(param)
 			if param.value.strip().lower() == "y" or param.value.strip().lower() == "yes":
-				param.value = "true\n"
+				wikicode.add("SectionType", str(param.name))  # set FieldBoss and Mainstream to be part of SectionType.
+		elif param.name == "Aggro":
+			if param.value.strip().lower() == "y" or param.value.strip().lower() == "yes":
+				param.value = "true\n"  # set aggro to true
 			else:
 				param.value = "false\n"
 
 	for param in params_to_remove:
-		params_list.remove(param)  # remove since we are going for list approach
-
+		params_list.remove(param)  # remove since we are going for list approach on skills
+	wikicode.add("Type", monster_type + "\n")
+	wikicode.add("Section", section + "\n")
 	wikicode.add("Skills", ",".join(skills_list))
+
 	return wikicode
 
 
@@ -103,61 +115,124 @@ def get_ready_wikicode(wikicode):
 	return mwparserfromhell.parse(new_string)
 
 
-def write_files_or_upload(current_monster_name, orig_wikicode, ready_wikicode):
-	similar_value = similar(str(orig_wikicode), str(ready_wikicode))
+###############
+# Manually adds data for {{SemanticMonsterDifficultyData template
+###############
+def make_monster_diff(wikicode, monster_type):
+	difficulty_template = mwparserfromhell.parse("{{SemanticMonsterDifficultyData\n}}").filter_templates()[0]
+	if monster_type == "Normal":
+		dungeon = try_or(lambda: wikicode.get("DungeonLocations").value, "")
+		field = try_or(lambda: wikicode.get("FieldLocations").value, "")
 
+		difficulty_template.add("Locations", str(dungeon).replace("*None", "") + str(field).replace("*None", "") + "\n")
+
+		difficulty_template.add("Difficulty", "\n")
+
+		# first, move all values to difficulty_template
+		difficulty_template.add("HP", try_or(lambda: wikicode.get("HP").value, "\n"))
+		difficulty_template.add("CP", try_or(lambda: wikicode.get("CP").value, "\n"))
+		difficulty_template.add("Defense", try_or(lambda: wikicode.get("Defense").value, "\n"))
+		difficulty_template.add("Protection", try_or(lambda: wikicode.get("Protection").value, "\n"))
+		difficulty_template.add("MeleeDamage", try_or(lambda: wikicode.get("MeleeDamage").value, "\n"))
+		difficulty_template.add("RangedDamage", try_or(lambda: wikicode.get("RangedDamage").value, "\n"))
+
+		difficulty_template.add("MonsterCrit", try_or(lambda: wikicode.get("MonsterCrit").value, "\n"))
+		difficulty_template.add("EXP", try_or(lambda: wikicode.get("EXP").value, "\n"))
+		difficulty_template.add("Gold", try_or(lambda: wikicode.get("Gold").value, "\n"))
+		difficulty_template.add("DropEquip", try_or(lambda: wikicode.get("DropEquip").value, "\n"))
+		difficulty_template.add("DropMisc", try_or(lambda: wikicode.get("DropMisc").value, "\n"))
+
+		# Then remove original values
+		try_or(lambda: wikicode.remove("HP"), "")
+		try_or(lambda: wikicode.remove("CP"), "")
+		try_or(lambda: wikicode.remove("Defense"), "")
+		try_or(lambda: wikicode.remove("Protection"), "")
+		try_or(lambda: wikicode.remove("MeleeDamage"), "")
+		try_or(lambda: wikicode.remove("RangedDamage"), "")
+
+		try_or(lambda: wikicode.remove("MonsterCrit"), "")
+		try_or(lambda: wikicode.remove("EXP"), "")
+		try_or(lambda: wikicode.remove("Gold"), "")
+		try_or(lambda: wikicode.remove("DropEquip"), "")
+		try_or(lambda: wikicode.remove("DropMisc"), "")
+
+		try_or(lambda: wikicode.remove("DungeonLocations"), "")
+		try_or(lambda: wikicode.remove("FieldLocations"), "")
+
+	return mwparserfromhell.parse(
+		re.sub(r'[\n]{2,}', '\n', str(wikicode)) + "<nowiki/>\n" + re.sub(r'[\n]{2,}', '\n', str(difficulty_template)))
+
+
+def write_files_or_upload(current_monster_name, ready_wikicode):
 	value = ""
 	while value == "":
-		value = input(
-			"[%s] Similar value is %0.2f. Do you want to upload now? (y/n) " % (current_monster_name, similar_value))
+		value = input("Do you want to upload now? [%s](y/n) " % current_monster_name)
 	if value.lower() == "y":
 		myupload(current_monster_name, str(ready_wikicode))
 
 	else:
-		write_files(current_monster_name, orig_wikicode, ready_wikicode, similar_value)
+		write_files(current_monster_name, ready_wikicode)
 
 
 ###############
 # write files for staging and reviewing
 ###############
-def write_files(current_monster_name, orig_wikicode, ready_wikicode, similar_value):
-	status_out = "We have a %0.2f difference between old and new for %s" % (similar_value, current_monster_name)
+def write_files(current_monster_name, ready_wikicode):
+	with open("output/%s.new.txt" % current_monster_name, "w") as goodFile:
+		goodFile.write(str(ready_wikicode))
 
-	if similar_value > 0.7:
-		with open("good/%s.old" % current_monster_name, "w") as goodFile:
-			goodFile.write(str(orig_wikicode))
-		with open("good/%s.new" % current_monster_name, "w") as goodFile:
-			goodFile.write(str(ready_wikicode))
-	else:
-		status_out = "{BAD] " + status_out
-
-		with open("bad/%s.old" % current_monster_name, "w") as goodFile:
-			goodFile.write(str(orig_wikicode))
-		with open("bad/%s.new" % current_monster_name, "w") as goodFile:
-			goodFile.write(str(ready_wikicode))
-
-	print(status_out)
+	print("Wrote data")
 
 
 def preprocess_pages():
 	# for each family, get the templates used.
 
 	for current_family in FAMILY_PAGES_LIST:
-		current_page_templates_list = extract_templates(current_family)
-		for item in current_page_templates_list:
-			if "StyleMonster" in str(
-					item.params):  # this file only processes normal monsters. Ignore Lord/Shadow mission/etc
-				current_monster_name = str(item.name).replace("DataMonster", "")
-				current_data_monster_templates_list = extract_templates("Template:" + str(item.name))
+		current_page = semigration.parse(current_family)
+		for key, value in current_page.headers.items():
+			section = key
+			if "DataMonster" in str(value.templates):  # ignore sections without DataMonster "general information"
+				for item in value.templates:
+					monster_type = "Normal"
+					if "StyleShadowMonster" in str(item['format']):
+						monster_type = "Shadow"
+					elif "StyleLordMonster" in str(item['format']):
+						monster_type = "Lord"
+					elif "StyleFinnachaidMonster" in str(item['format']):
+						monster_type = "Sidhe"
+					elif "StyleBandit" in str(item['format']):
+						monster_type = "Bandit"
+					elif "StyleAlban Dungeon Monster," in str(item['format']):
+						monster_type = "Alban"
+					elif "StyleShadowMonster" in str(item['format']):
+						monster_type = "Baltane"
+					elif "StyleShadowMonster" in str(item['format']):
+						monster_type = "Theater"
+					elif "Raid Dungeon Monster" in str(item["format"]):
+						monster_type = "Raid"
 
-				# Now we search for the {{{format}}} template
-				for wikicode in current_data_monster_templates_list:
-					if "{{{format" in str(wikicode.name):
-						orig_wikicode = str(wikicode)
-						param_done_wikicode = process_params(wikicode)
-						ready_wikicode = get_ready_wikicode(param_done_wikicode)
+					current_monster_name = str(item.name).replace("DataMonster", "")
+					current_data_monster_templates_list = extract_templates("Template:" + str(item.name))
 
-						write_files_or_upload(current_monster_name, orig_wikicode, ready_wikicode)
+					param_done_wikicode = ""
+					indexes_to_delete = []
+					# Now we search for the {{{format}}} template
+					for i, wikicode in enumerate(current_data_monster_templates_list):
+						if "{{{format" in str(wikicode.name):
+							orig_wikicode = str(wikicode)
+							param_done_wikicode = process_params_pages_skills_cp_capital_fieldboss_mainstream_section(
+								wikicode, monster_type, section)
+						else:
+							indexes_to_delete.append(i)
+
+					for idx in indexes_to_delete:  # remove any non {{{format from list
+						del current_data_monster_templates_list[idx]
+
+					if param_done_wikicode != "":
+						wikicode_with_monster_difficulty = make_monster_diff(param_done_wikicode, monster_type)
+						ready_wikicode = get_ready_wikicode(wikicode_with_monster_difficulty)
+
+						write_files_or_upload(current_monster_name, ready_wikicode)
 
 
 def process_file(filepath, page_name):
@@ -173,7 +248,7 @@ def process_file(filepath, page_name):
 def upload_listdir(directory):
 	for root, dirs, files in os.walk(directory):
 		for file in files:
-			if file.endswith('.new'):
+			if file.endswith('.new.txt'):
 				process_file(directory + "/" + file, file.split(".")[0])
 
 	print("d")
@@ -181,15 +256,14 @@ def upload_listdir(directory):
 
 def main():
 	preprocess_pages()
-	upload_listdir("good")
-	upload_listdir("bad")
+
+
+# upload_listdir("output")
 
 
 if __name__ == "__main__":
 	import os
 
-	if not os.path.isdir("good"):
-		os.mkdir("good")  # files that have a similar_value above 0.7. We should be able to upload
-	if not os.path.isdir("bad"):
-		os.mkdir("bad")  # files that are too different. Might need to check them
+	if not os.path.isdir("output"):
+		os.mkdir("output")  # Save files to upload later
 	main()
