@@ -118,7 +118,7 @@ def get_ready_wikicode(wikicode):
 ###############
 # Manually adds data for {{SemanticMonsterDifficultyData template
 ###############
-def make_monster_diff(wikicode, monster_type):
+def make_monster_difficulty(wikicode, monster_type):
 	difficulty_template = mwparserfromhell.parse("{{SemanticMonsterDifficultyData\n}}").filter_templates()[0]
 	if monster_type == "Normal":
 		dungeon = try_or(lambda: wikicode.get("DungeonLocations").value, "")
@@ -159,9 +159,61 @@ def make_monster_diff(wikicode, monster_type):
 		try_or(lambda: wikicode.remove("DungeonLocations"), "")
 		try_or(lambda: wikicode.remove("FieldLocations"), "")
 
+	if monster_type == "Shadow":
+		wikicode, difficulty_template = process_params_shadow(wikicode)
 	return mwparserfromhell.parse(
 		re.sub(r'[\n]{2,}', '\n', str(wikicode)) + "<nowiki/>\n" + re.sub(r'[\n]{2,}', '\n', str(difficulty_template)))
 
+
+###############
+# Manually adds data for {{SemanticMonsterDifficultyData template for shadow monsters
+###############
+def process_params_shadow(wikicode):
+	difficulty_total = ""
+	params_list = wikicode.params
+
+	for param in params_list:
+		if "Mission" in param.name:  # change Mission to MissionsList
+			param.name = "MissionsList"
+		elif "AllDropMisc" in param.name:
+			param.name = "DropMiscCommon"
+		elif "AllDropEquip" in param.name:
+			param.name = "DropEquipCommon"
+
+	for diff in ["Basic", "Intermediate", "Advanced", "Hard", "Elite"]:
+		difficulty_template = mwparserfromhell.parse("{{SemanticMonsterDifficultyData\n}}").filter_templates()[0]
+
+		difficulty_template.add("Difficulty", diff + "\n")
+
+		# first, move all values to difficulty_template
+		difficulty_template.add(diff + "HP", try_or(lambda: wikicode.get(diff + "HP").value, "\n"))
+		difficulty_template.add(diff + "CP", try_or(lambda: wikicode.get(diff + "CP").value, "\n"))
+		difficulty_template.add(diff + "Defense", try_or(lambda: wikicode.get(diff + "Defense").value, "\n"))
+		difficulty_template.add(diff + "Protection", try_or(lambda: wikicode.get(diff + "Protection").value, "\n"))
+		difficulty_template.add(diff + "MeleeDamage", try_or(lambda: wikicode.get(diff + "MeleeDamage").value, "\n"))
+		difficulty_template.add(diff + "RangedDamage", try_or(lambda: wikicode.get(diff + "RangedDamage").value, "\n"))
+
+		difficulty_template.add(diff + "Crit", try_or(lambda: wikicode.get(diff + "Crit").value, "\n"))
+		difficulty_template.add(diff + "EXP", try_or(lambda: wikicode.get(diff + "EXP").value, "\n"))
+		difficulty_template.add(diff + "Gold", try_or(lambda: wikicode.get(diff + "Gold").value, "\n"))
+		difficulty_template.add(diff + "DropEquip", try_or(lambda: wikicode.get(diff + "DropEquip").value, "\n"))
+		difficulty_template.add(diff + "DropMisc", try_or(lambda: wikicode.get(diff + "DropMisc").value, "\n"))
+
+		# Then remove original values
+		try_or(lambda: wikicode.remove(diff + "HP"), "")
+		try_or(lambda: wikicode.remove(diff + "CP"), "")
+		try_or(lambda: wikicode.remove(diff + "Defense"), "")
+		try_or(lambda: wikicode.remove(diff + "Protection"), "")
+		try_or(lambda: wikicode.remove(diff + "MeleeDamage"), "")
+		try_or(lambda: wikicode.remove(diff + "RangedDamage"), "")
+
+		try_or(lambda: wikicode.remove(diff + "Crit"), "")
+		try_or(lambda: wikicode.remove(diff + "EXP"), "")
+		try_or(lambda: wikicode.remove(diff + "Gold"), "")
+		try_or(lambda: wikicode.remove(diff + "DropEquip"), "")
+		try_or(lambda: wikicode.remove(diff + "DropMisc"), "")
+		difficulty_total = difficulty_total + str(difficulty_template) + "<nowiki/>\n"
+	return wikicode, difficulty_total
 
 def write_files_or_upload(current_monster_name, ready_wikicode):
 	value = ""
@@ -229,7 +281,7 @@ def preprocess_pages():
 						del current_data_monster_templates_list[idx]
 
 					if param_done_wikicode != "":
-						wikicode_with_monster_difficulty = make_monster_diff(param_done_wikicode, monster_type)
+						wikicode_with_monster_difficulty = make_monster_difficulty(param_done_wikicode, monster_type)
 						ready_wikicode = get_ready_wikicode(wikicode_with_monster_difficulty)
 
 						write_files_or_upload(current_monster_name, ready_wikicode)
