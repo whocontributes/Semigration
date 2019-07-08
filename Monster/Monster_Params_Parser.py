@@ -80,7 +80,8 @@ def make_monster_difficulty(wikicode, monster_type):
 		wikicode, difficulty_template = process_params_shadow(wikicode)
 	if monster_type == "Lord":
 		wikicode, difficulty_template = process_params_lords(wikicode)
-
+	if monster_type == "Baltane":
+		wikicode, difficulty_template = process_params_baltane(wikicode)
 	return mwparserfromhell.parse(
 		re.sub(r'[\n]{2,}', '\n', str(wikicode)) + "<nowiki/>\n" + re.sub(r'[\n]{2,}', '\n', str(difficulty_template)))
 
@@ -205,4 +206,85 @@ def process_params_lords(wikicode):
 	difficulty_template = cleanup(difficulty_template)
 
 	difficulty_total = difficulty_total + str(difficulty_template) + "<nowiki/>\n"
+	return wikicode, difficulty_total
+
+
+###############
+# Manually adds data for {{SemanticMonsterDifficultyData template for baltane monsters
+###############
+def process_params_baltane(wikicode):
+	difficulty_total = ""
+	params_list = wikicode.params
+
+	for param in params_list:
+		if "Mission" in param.name:  # change Mission to MissionsList
+			param.name = "MissionsList"
+		elif "AllDropMisc" in param.name:
+			param.name = "DropMiscCommon"
+		elif "AllDropEquip" in param.name:
+			param.name = "DropEquipCommon"
+
+	for diff in ["Intermediate", "Advanced", "Hard", "Lord"]:
+		# Remove unneeded values
+		try_or(lambda: wikicode.remove(diff + "HP"), "")
+		try_or(lambda: wikicode.remove(diff + "CP"), "")
+		try_or(lambda: wikicode.remove(diff + "Defense"), "")
+		try_or(lambda: wikicode.remove(diff + "Protection"), "")
+		try_or(lambda: wikicode.remove(diff + "MeleeDamage"), "")
+		try_or(lambda: wikicode.remove(diff + "RangedDamage"), "")
+
+		try_or(lambda: wikicode.remove(diff + "Crit"), "")
+		try_or(lambda: wikicode.remove(diff + "EXP"), "")
+		try_or(lambda: wikicode.remove(diff + "Gold"), "")
+		try_or(lambda: wikicode.remove(diff + "DropEquip"), "")
+		try_or(lambda: wikicode.remove(diff + "DropMisc"), "")
+
+	for diff in ["Basic", "Elite"]:
+		difficulty_template = mwparserfromhell.parse("{{SemanticMonsterDifficultyData\n}}").filter_templates()[0]
+
+		difficulty_template.add("Difficulty", diff + "\n")
+
+		# first, move all values to difficulty_template
+		difficulty_template.add("HP", try_or(lambda: wikicode.get(diff + "HP").value, "\n"))
+		if diff == "Elite":
+			if "Giant" in str(wikicode.get(diff + "Defense").value):
+				difficulty_template.add("CP", "-5\n")
+			else:
+				difficulty_template.add("CP", "-4\n")
+		else:
+			if "Giant" in str(wikicode.get(diff + "Defense").value):
+				difficulty_template.add("CP", "-4\n")
+			else:
+				difficulty_template.add("CP", "-3\n")
+
+		difficulty_template.add("Defense", try_or(lambda: wikicode.get(diff + "Defense").value, "\n"))
+		difficulty_template.add("Protection", try_or(lambda: wikicode.get(diff + "Protection").value, "\n"))
+		difficulty_template.add("MeleeDamage",
+								try_or(lambda: wikicode.get(diff + "MeleeDamage").value, "\n"))
+		difficulty_template.add("RangedDamage",
+								try_or(lambda: wikicode.get(diff + "RangedDamage").value, "\n"))
+
+		difficulty_template.add("Crit", try_or(lambda: wikicode.get(diff + "Crit").value, "\n"))
+		difficulty_template.add("EXP", try_or(lambda: wikicode.get(diff + "EXP").value, "\n"))
+		difficulty_template.add("Gold", try_or(lambda: wikicode.get(diff + "Gold").value, "\n"))
+		difficulty_template.add("DropEquip", try_or(lambda: wikicode.get(diff + "DropEquip").value, "\n"))
+		difficulty_template.add("DropMisc", try_or(lambda: wikicode.get(diff + "DropMisc").value, "\n"))
+
+		# Then remove original values
+		try_or(lambda: wikicode.remove(diff + "HP"), "")
+		try_or(lambda: wikicode.remove(diff + "CP"), "")
+		try_or(lambda: wikicode.remove(diff + "Defense"), "")
+		try_or(lambda: wikicode.remove(diff + "Protection"), "")
+		try_or(lambda: wikicode.remove(diff + "MeleeDamage"), "")
+		try_or(lambda: wikicode.remove(diff + "RangedDamage"), "")
+
+		try_or(lambda: wikicode.remove(diff + "Crit"), "")
+		try_or(lambda: wikicode.remove(diff + "EXP"), "")
+		try_or(lambda: wikicode.remove(diff + "Gold"), "")
+		try_or(lambda: wikicode.remove(diff + "DropEquip"), "")
+		try_or(lambda: wikicode.remove(diff + "DropMisc"), "")
+		difficulty_template = cleanup(difficulty_template)
+
+		difficulty_total = difficulty_total + str(difficulty_template) + "<nowiki/>\n"
+
 	return wikicode, difficulty_total

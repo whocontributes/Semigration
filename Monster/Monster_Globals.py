@@ -1,6 +1,7 @@
 # whocontributes 07/04/2019
 # pulled from https://wiki.mabinogiworld.com/index.php?title=Special:WhatLinksHere/Template:StyleMonster&namespace=0&limit=500
-FAMILY_PAGES_LIST = ["Bat", "Bear", "Horse","Mimic", "Goblin", "Wolf", "Skeleton", "Golem", "Spider", "Rat", "Snake", "Ogre",
+FAMILY_PAGES_LIST = ["Bat", "Bear", "Horse", "Mimic", "Goblin", "Wolf", "Skeleton", "Golem", "Spider", "Rat", "Snake",
+					 "Ogre",
 					 "Kobold", "Troll", "Imp", "Succubus", "Wisp", "Flying Sword", "Gremlin", "Werewolf", "Rat Man",
 					 "Gargoyle", "Raccoon", "Lycanthrope", "Nightmare Humanoid", "Worm", "Gorgon", "Jackal",
 					 "Black Wizard (Monster)", "Cyclops", "Sprite", "Zombie", "Siren (Monster)", "Incubus", "Argus",
@@ -135,3 +136,5 @@ VALID_SKILLS = ["Abyss Judgement", "Abyss Snare", "Abyss Terror", "Act 1: Inciti
 				"Wool of the Gods", "Wounding Soul"]
 SKILL_BLACKLIST = ['HeavyStander', 'ManaDeflector', 'NaturalShield', 'None']
 CAPITIAL_EACH_WORD = ["Speed", "Element", "AggroRange", "AggroSpeed"]
+BALTANE_MISSIONS = ["Avalon Bridge", "Nowhere to Run", "Knights of the Round Table", "Gatekeeper",
+					"Counterattack (Baltane Mission)", "Siege Weapon"]

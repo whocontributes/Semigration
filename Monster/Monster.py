@@ -7,7 +7,7 @@ import clipboard
 import mwclient
 import mwparserfromhell
 
-from Monster_Globals import SKILL_BLACKLIST, VALID_SKILLS, CAPITIAL_EACH_WORD, FAMILY_PAGES_LIST
+from Monster_Globals import SKILL_BLACKLIST, VALID_SKILLS, CAPITIAL_EACH_WORD, FAMILY_PAGES_LIST, BALTANE_MISSIONS
 from Monster_Params_Parser import make_monster_difficulty
 
 import semigration
@@ -137,7 +137,7 @@ def write_files(current_monster_name, ready_wikicode):
 	with open("output/%s.new.txt" % current_monster_name, "w") as goodFile:
 		goodFile.write(str(ready_wikicode))
 
-	print("Wrote data")
+	print("Wrote to file")
 
 
 def preprocess_pages():
@@ -149,50 +149,55 @@ def preprocess_pages():
 			section = key
 			if "DataMonster" in str(value.templates):  # ignore sections without DataMonster "general information"
 				for item in value.templates:
-					monster_type = "Normal"
-					if "StyleShadowMonster" in str(item['format']):
-						monster_type = "Shadow"
-					elif "StyleFinnachaidMonster" in str(item['format']):
-						monster_type = "Sidhe"
-					elif "StyleBandit" in str(item['format']):
-						monster_type = "Bandit"
-					elif "StyleAlban Dungeon Monster," in str(item['format']):
-						monster_type = "Alban"
-					elif "StyleShadowMonster" in str(item['format']):
-						monster_type = "Baltane"
-					elif "StyleShadowMonster" in str(item['format']):
-						monster_type = "Theater"
-					elif "Raid Dungeon Monster" in str(item["format"]):
-						monster_type = "Raid"
+					if "DataMonster" in str(item):  # again ignore non DataMonster templates, like enchants
+						monster_type = "Normal"
+						if "StyleShadowMonster" in str(item['format']):
+							monster_type = "Shadow"
+						elif "StyleFinnachaidMonster" in str(item['format']):
+							monster_type = "Sidhe"
+						elif "StyleBandit" in str(item['format']):
+							monster_type = "Bandit"
+						elif "StyleAlban Dungeon Monster," in str(item['format']):
+							monster_type = "Alban"
+						elif "StyleShadowMonster" in str(item['format']):
+							monster_type = "Theater"
+						elif "Raid Dungeon Monster" in str(item["format"]):
+							monster_type = "Raid"
 
-					current_monster_name = str(item.name).replace("DataMonster", "")
-					current_data_monster_templates_list = extract_templates("Template:" + str(item.name))
+						current_monster_name = str(item.name).replace("DataMonster", "")
+						current_data_monster_templates_list = extract_templates("Template:" + str(item.name))
 
-					if monster_type == "Shadow" and "Lord" in str(current_data_monster_templates_list):
-						print("[WARNING] Lord monster detected. Please confirm output.")
-						monster_type = "Lord"
-					else:
-						monster_type = "Shadow"
-
-					param_done_wikicode = ""
-					indexes_to_delete = []
-					# Now we search for the {{{format}}} template
-					for i, wikicode in enumerate(current_data_monster_templates_list):
-						if "{{{format" in str(wikicode.name):
-							orig_wikicode = str(wikicode)
-							param_done_wikicode = process_common_params(
-								wikicode, monster_type, section)
+						if monster_type == "Shadow" and "Lord" in str(current_data_monster_templates_list):
+							print("[WARNING] Lord monster detected. Please confirm output.")
+							monster_type = "Lord"
+						elif monster_type == "Shadow" and any(
+								balt_mission in str(current_data_monster_templates_list) for balt_mission in
+								BALTANE_MISSIONS):
+							print("[WARNING] Baltane monster detected. Please confirm output.")
+							monster_type = "Baltane"
 						else:
-							indexes_to_delete.append(i)
+							monster_type = "Shadow"
 
-					for idx in indexes_to_delete:  # remove any non {{{format from list
-						del current_data_monster_templates_list[idx]
+						param_done_wikicode = ""
+						indexes_to_delete = []
+						# Now we search for the {{{format}}} template
+						for i, wikicode in enumerate(current_data_monster_templates_list):
+							if "{{{format" in str(wikicode.name):
+								orig_wikicode = str(wikicode)
+								param_done_wikicode = process_common_params(
+									wikicode, monster_type, section)
+							else:
+								indexes_to_delete.append(i)
 
-					if param_done_wikicode != "":
-						wikicode_with_monster_difficulty = make_monster_difficulty(param_done_wikicode, monster_type)
-						ready_wikicode = get_ready_wikicode(wikicode_with_monster_difficulty)
+						for idx in indexes_to_delete:  # remove any non {{{format from list
+							del current_data_monster_templates_list[idx]
 
-						write_files_or_upload(current_monster_name, ready_wikicode)
+						if param_done_wikicode != "":
+							wikicode_with_monster_difficulty = make_monster_difficulty(param_done_wikicode,
+																					   monster_type)
+							ready_wikicode = get_ready_wikicode(wikicode_with_monster_difficulty)
+
+							write_files_or_upload(current_monster_name, ready_wikicode)
 
 
 def process_file(filepath, page_name):
