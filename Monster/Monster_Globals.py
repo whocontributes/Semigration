@@ -136,5 +136,9 @@ VALID_SKILLS = ["Abyss Judgement", "Abyss Snare", "Abyss Terror", "Act 1: Inciti
 				"Wool of the Gods", "Wounding Soul"]
 SKILL_BLACKLIST = ['HeavyStander', 'ManaDeflector', 'NaturalShield', 'None']
 CAPITIAL_EACH_WORD = ["Speed", "Element", "AggroRange", "AggroSpeed"]
+NUMERICAL_VALUES = ["ExplosiveDamage", "HP", "CP", "Defense", "Protection", "Crit", "EXP"]
 BALTANE_MISSIONS = ["Avalon Bridge", "Nowhere to Run", "Knights of the Round Table", "Gatekeeper",
 					"Counterattack (Baltane Mission)", "Siege Weapon"]
+SPEED = ["Very Slow", "Slow", "Medium", "Fast", "Very Fast", "Immobile", ""]
+AGGRO_SPEED = ["Very Slow", "Slow", "Medium", "Fast", "Very Fast", "Instant", ""]
+AGGRO_RANGE = ["Very Small", "Small", "Medium", "Far", "Very Far", "Extremely Far", ""]
