@@ -52,6 +52,36 @@ def extract_templates(page=None, *, text=None):
 	return mwparserfromhell.parse(text).filter_templates()
 
 
+###############
+# Takes in a param from wikicode and a list.
+# Using difflib, find the closest value from list and return the param
+###############
+def get_closest(param, look_in_list):
+	global warning_text
+	closest_range_list = difflib.get_close_matches(str(param.value).strip(), look_in_list)
+	if len(closest_range_list) > 1:
+		param.value = closest_range_list[0] + "\n"
+	else:
+		warning_text = warning_text + "'''When importing data, old parameter [{0}] was '{1}'. Please check output.'''<br>".format(
+			param.name, param.value.strip())
+		param.value = "\n"  # could not find a value.
+	return param
+
+
+###############
+# Using .lower() check if param.value is 'y' or 'yes'. Return param with new 'Yes' or 'No'
+###############
+def yes_no(param):
+	if param.value.strip().lower() == "y" or param.value.strip().lower() == "yes":
+		param.value = "Yes\n"  # set aggro to true
+	else:
+		param.value = "No\n"
+	return param
+
+
+###############
+# From the gold value, try to split using dash and return min and max. If failed, set to 0.
+###############
 def convert_gold(param_name, value):
 	global warning_text
 	min = 0
@@ -127,53 +157,28 @@ def process_common_params(wikicode, monster_type, section):
 		elif param.name == "Speed":
 			if str(param.value).strip() == "Average" or str(param.value).strip() == "Normal":
 				param.value = "Medium"
-
-			closest_range_list = difflib.get_close_matches(str(param.value).strip(), SPEED)
-			if len(closest_range_list) > 1:
-				param.value = closest_range_list[0] + "\n"
-			else:
-				warning_text = warning_text + "'''When importing data, old parameter [{0}] was '{1}'. Please check output.'''<br>".format(
-					param.name, param.value.strip())
-				param.value = "\n"  # could not find a value.
+			param = get_closest(param, SPEED)
 		elif param.name == "AggroSpeed":
 			if str(param.value).strip() == "Average" or str(param.value).strip() == "Normal":
 				param.value = "Medium"
 			if str(param.value).strip() == "Small":
 				param.value = "Slow"
+			param = get_closest(param, AGGRO_SPEED)
 
-			closest_range_list = difflib.get_close_matches(str(param.value).strip(), AGGRO_SPEED)
-			if len(closest_range_list) > 1:
-				param.value = closest_range_list[0] + "\n"
-			else:
-				warning_text = warning_text + "'''When importing data, old parameter [{0}] was '{1}'. Please check output.'''<br>".format(
-					param.name, param.value.strip())
-				param.value = "\n"  # could not find a value.
 		elif param.name == "AggroRange":
 			if str(param.value).strip() == "Average" or str(param.value).strip() == "Normal":
 				param.value = "Medium"
 			if str(param.value).strip() == "Wide":
 				param.value = "Far"
+			param = get_closest(param, AGGRO_RANGE)
 
-			closest_range_list = difflib.get_close_matches(str(param.value).strip(), AGGRO_RANGE)
-			if len(closest_range_list) > 1:
-				param.value = closest_range_list[0] + "\n"
-			else:
-				warning_text = warning_text + "'''When importing data, old parameter [{0}] was '{1}'. Please check output.'''<br>".format(
-					param.name, param.value.strip())
-				param.value = "\n"  # could not find a value.
 		elif "CP" in param.name:  # If CP has a "?", convert to empty string
 			if param.value.strip().lower() == "?":
 				param.value = "\n"
 		elif "FieldBoss" in param.name or "Mainstream" in param.name:
-			if param.value.strip().lower() == "y" or param.value.strip().lower() == "yes":
-				param.value = "Yes\n"
-			else:
-				param.value = "No\n"
+			param = yes_no(param)
 		elif param.name == "Aggro":
-			if param.value.strip().lower() == "y" or param.value.strip().lower() == "yes":
-				param.value = "Yes\n"  # set aggro to true
-			else:
-				param.value = "No\n"
+			param = yes_no(param)
 		elif param.name == "Element":
 			if param.value.strip().lower() == "Unknown":
 				param.value = "\n"
@@ -207,7 +212,7 @@ def process_common_params(wikicode, monster_type, section):
 def get_ready_wikicode(wikicode, warning_text):
 	# wikicode = wikicode.replace("{{{format}}}", "SemanticMonsterData")
 
-	string = str(wikicode) + "<nowiki/>\n{{RenderSemanticMonster}}<nowiki/>\n" + warning_text
+	string = str(wikicode) + "{{RenderSemanticMonster}}<nowiki/>\n" + warning_text
 	i = string.index('\n')
 	new_string = "{{SemanticMonsterData" + string[i:]
 	return mwparserfromhell.parse(new_string)
