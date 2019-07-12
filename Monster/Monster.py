@@ -59,7 +59,7 @@ def extract_templates(page=None, *, text=None):
 def get_closest(param, look_in_list):
 	global warning_text
 	closest_range_list = difflib.get_close_matches(str(param.value).strip(), look_in_list)
-	if len(closest_range_list) > 1:
+	if len(closest_range_list) >= 1:
 		param.value = closest_range_list[0] + "\n"
 	else:
 		warning_text = warning_text + "'''When importing data, old parameter [{0}] was '{1}'. Please check output.'''<br>".format(
@@ -102,6 +102,57 @@ NUMBERS_ONLY = re.compile(r'[^0-9]')
 
 
 ###############
+# From input wikicode, find all passive defenses
+# If there is a letter, or value above 3, convert using formula   A-F=1   2-9=2   1=3
+def convert_passive_def(wikicode):
+	HS = try_or(lambda: wikicode.get("SkillHeavyStander").value.strip(), "0")
+	MD = try_or(lambda: wikicode.get("SkillManaDeflector").value.strip(), "0")
+	NS = try_or(lambda: wikicode.get("SkillNaturalShield").value.strip(), "0")
+	bool_convert = False
+
+	if HS.isalpha() or MD.isalpha() or NS.isalpha():  # if there is A-F
+		bool_convert = True
+	else:
+		if int(HS) > 3 or int(MD) > 3 or int(NS) > 3:  # if there is 4-9
+			bool_convert = True
+
+	try_or(lambda: wikicode.remove("SkillHeavyStander"), "")
+	try_or(lambda: wikicode.remove("SkillManaDeflector"), "")
+	try_or(lambda: wikicode.remove("SkillNaturalShield"), "")
+
+	if bool_convert:
+		if HS.isalpha():  # A-F is 1
+			wikicode.add("SkillHeavyStander", "1")
+		else:
+			if int(HS) > 1:  # 2-9 is 2
+				wikicode.add("SkillHeavyStander", "2")
+			elif int(HS) == 1:
+				wikicode.add("SkillHeavyStander", "3")  # rank 1 is level 3. If value is 0, monster does not have def
+
+		if MD.isalpha():  # A-F is 1
+			wikicode.add("SkillManaDeflector", "1")
+		else:
+			if int(MD) > 1:  # 2-9 is 2
+				wikicode.add("SkillManaDeflector", "2")
+			elif int(MD) == 1:
+				wikicode.add("SkillManaDeflector", "3")  # rank 1 is level 3. If value is 0, monster does not have def
+
+		if NS.isalpha():  # A-F is 1
+			wikicode.add("SkillNaturalShield", "1")
+		else:
+			if int(NS) > 1:  # 2-9 is 2
+				wikicode.add("SkillNaturalShield", "2")
+			elif int(NS) == 1:
+				wikicode.add("SkillNaturalShield", "3")  # rank 1 is level 3. If value is 0, monster does not have def
+	else:
+		if int(HS) != 0: wikicode.add("SkillHeavyStander", HS)
+		if int(MD) != 0: wikicode.add("SkillManaDeflector", MD)
+		if int(NS) != 0: wikicode.add("SkillNaturalShield", NS)
+
+	return wikicode
+
+
+###############
 # Processes the parameters,
 # Page-> Family,
 # Skills,
@@ -120,6 +171,7 @@ def process_common_params(wikicode, monster_type, section):
 	if fileExt is None:
 		warning_text = warning_text + "'''When importing data, file extension was not set (|Ext=). Please check output'''<br>"
 
+	wikicode = convert_passive_def(wikicode)
 	params_list = wikicode.params
 	params_to_remove = []
 	skills_list = []
@@ -170,6 +222,8 @@ def process_common_params(wikicode, monster_type, section):
 				param.value = "Medium"
 			if str(param.value).strip() == "Wide":
 				param.value = "Far"
+			if str(param.value).strip() == "Short":
+				param.value = "Small"
 			param = get_closest(param, AGGRO_RANGE)
 
 		elif "CP" in param.name:  # If CP has a "?", convert to empty string
@@ -238,7 +292,6 @@ def write_files(current_monster_name, ready_wikicode):
 
 	print("Wrote to file")
 
-
 def preprocess_pages():
 	global warning_text
 	# for each family, get the templates used.
@@ -279,6 +332,9 @@ def preprocess_pages():
 								BALTANE_MISSIONS):
 							print("[WARNING] Baltane monster detected. Please confirm output.")
 							monster_type = "Baltane"
+						elif "Finnachaid" in str(current_data_monster_templates_list):
+							print("[WARNING] Sidhe Finnachaid monster detected. Please confirm output.")
+							monster_type = "Sidhe"
 
 						param_done_wikicode = ""
 						indexes_to_delete = []
