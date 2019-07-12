@@ -201,6 +201,10 @@ def process_common_params(wikicode, monster_type, section):
 				just_skill = str(param.name).replace("Skill", "")
 				if just_skill == "Counter":
 					just_skill = "Counterattack"  # goes to lance counter if we try closest match
+				if just_skill == "Flight":
+					just_skill = "Flight (Monster Skill)"
+				if just_skill == "DragonDashAttack":
+					just_skill = "Smack"
 				closest_skill_list = difflib.get_close_matches(just_skill, VALID_SKILLS)
 				skills_list.append(closest_skill_list[0])
 
@@ -343,6 +347,8 @@ def preprocess_pages():
 							if "{{{format" in str(wikicode.name):
 								param_done_wikicode = process_common_params(
 									wikicode, monster_type, section)
+							elif "times" in str(wikicode.name):
+								pass # keep template times
 							else:
 								indexes_to_delete.append(i)
 

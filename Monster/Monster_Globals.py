@@ -1,9 +1,9 @@
 # whocontributes 07/04/2019
 # pulled from https://wiki.mabinogiworld.com/index.php?title=Special:WhatLinksHere/Template:StyleMonster&namespace=0&limit=500
-FAMILY_PAGES_LIST = ["Bat", "Bear", "Horse", "Mimic", "Goblin", "Wolf", "Skeleton", "Golem", "Spider", "Rat", "Snake",
-					 "Ogre",
-					 "Kobold", "Troll", "Imp", "Succubus", "Wisp", "Flying Sword", "Gremlin", "Werewolf", "Rat Man",
-					 "Gargoyle", "Raccoon", "Lycanthrope", "Nightmare Humanoid", "Worm", "Gorgon", "Jackal",
+FAMILY_PAGES_LIST = ["Bat", "Bear", "Horse", "Dragon", "Ogre", "Mimic", "Goblin", "Wolf", "Skeleton", "Golem", "Spider",
+					 "Rat", "Snake", "Kobold", "Troll", "Imp", "Succubus", "Wisp", "Flying Sword", "Gremlin",
+					 "Werewolf", "Rat Man", "Gargoyle", "Raccoon", "Lycanthrope",
+					 "Nightmare Humanoid", "Worm", "Gorgon", "Jackal",
 					 "Black Wizard (Monster)", "Cyclops", "Sprite", "Zombie", "Siren (Monster)", "Incubus", "Argus",
 					 "Coyote", "Giant Headless", "Boar", "Sahagin", "Gnoll", "Glas Ghaibhleann", "Laghodessa", "Ghost",
 					 "Stone Hound", "Stone Zombie", "Stone Horse", "Stone Imp", "Lich", "Cloaker", "Cow (NPC)",
