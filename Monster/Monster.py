@@ -8,7 +8,7 @@ import mwclient
 import mwparserfromhell
 
 from Monster_Globals import SKILL_BLACKLIST, VALID_SKILLS, CAPITIAL_EACH_WORD, FAMILY_PAGES_LIST, BALTANE_MISSIONS, \
-	NUMERICAL_VALUES, AGGRO_RANGE, AGGRO_SPEED, SPEED
+	NUMERICAL_VALUES, AGGRO_RANGE, AGGRO_SPEED, SPEED, THEATRE_MISSIONS
 from Monster_Params_Parser import make_monster_difficulty, try_or
 
 import semigration
@@ -86,6 +86,7 @@ def convert_gold(param_name, value):
 	global warning_text
 	min = 0
 	max = 0
+	value = value.replace('~', '-')
 	gold_list = value.split("-")
 	if len(gold_list) == 2:
 		min = try_or(lambda: int(gold_list[0].replace(',', '')), 0)
@@ -296,6 +297,7 @@ def write_files(current_monster_name, ready_wikicode):
 
 	print("Wrote to file")
 
+
 def preprocess_pages():
 	global warning_text
 	# for each family, get the templates used.
@@ -320,8 +322,6 @@ def preprocess_pages():
 							monster_type = "Bandit"
 						elif "StyleAlban Dungeon Monster," in str(item['format']):
 							monster_type = "Alban"
-						elif "StyleShadowMonster" in str(item['format']):
-							monster_type = "Theater"
 						elif "Raid Dungeon Monster" in str(item["format"]):
 							monster_type = "Raid"
 
@@ -336,6 +336,11 @@ def preprocess_pages():
 								BALTANE_MISSIONS):
 							print("[WARNING] Baltane monster detected. Please confirm output.")
 							monster_type = "Baltane"
+						elif monster_type == "Shadow" and any(
+								theatre in str(current_data_monster_templates_list) for theatre in
+								THEATRE_MISSIONS):
+							print("[WARNING] Theatre monster detected. Please confirm output.")
+							monster_type = "Theatre"
 						elif "Finnachaid" in str(current_data_monster_templates_list):
 							print("[WARNING] Sidhe Finnachaid monster detected. Please confirm output.")
 							monster_type = "Sidhe"
@@ -348,7 +353,7 @@ def preprocess_pages():
 								param_done_wikicode = process_common_params(
 									wikicode, monster_type, section)
 							elif "times" in str(wikicode.name):
-								pass # keep template times
+								pass  # keep template times
 							else:
 								indexes_to_delete.append(i)
 

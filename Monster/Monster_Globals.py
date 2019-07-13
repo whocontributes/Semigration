@@ -139,6 +139,8 @@ CAPITIAL_EACH_WORD = ["Speed", "Element", "AggroRange", "AggroSpeed"]
 NUMERICAL_VALUES = ["ExplosiveDamage", "HP", "CP", "Defense", "Protection", "Crit", "EXP"]
 BALTANE_MISSIONS = ["Avalon Bridge", "Nowhere to Run", "Knights of the Round Table", "Gatekeeper",
 					"Counterattack (Baltane Mission)", "Siege Weapon"]
+THEATRE_MISSIONS = ["The New King's Request", "Guardian of Avon", "Fortinbras's Expedition", "Warden of the Gods",
+					"Erinn Martial Arts"]
 SPEED = ["Very Slow", "Slow", "Medium", "Fast", "Very Fast", "Immobile", ""]
-AGGRO_SPEED = ["Very Slow", "Slow", "Medium", "Fast", "Very Fast", "Instant", ""]
-AGGRO_RANGE = ["Very Small", "Small", "Medium", "Far", "Very Far", "Extremely Far", ""]
+AGGRO_SPEED = ["Very Slow", "Slow", "Medium", "Fast", "Very Fast", "Instant", "None", ""]
+AGGRO_RANGE = ["Very Small", "Small", "Medium", "Far", "Very Far", "Extremely Far", "None", ""]
