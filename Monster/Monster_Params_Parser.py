@@ -115,6 +115,8 @@ def make_monster_difficulty(wikicode, monster_type):
 		wikicode, difficulty_template = process_params_baltane(wikicode)
 	if monster_type == "Sidhe":
 		wikicode, difficulty_template = process_params_sidhe(wikicode)
+	if monster_type == "Bandit":
+		wikicode, difficulty_template = process_params_bandit(wikicode)
 	return mwparserfromhell.parse(
 		re.sub(r'[\n]{2,}', '\n', str(cleanup(wikicode))) + "<nowiki/>\n" + re.sub(r'[\n]{2,}', '\n',
 																				   str(difficulty_template)))
@@ -248,4 +250,34 @@ def process_params_sidhe(wikicode):
 
 		difficulty_total = difficulty_total + str(difficulty_template) + "<nowiki/>\n"
 
+	return wikicode, difficulty_total
+
+
+###############
+# Manually adds data for {{SemanticMonsterDifficultyData template for bandit monsters
+###############
+def process_params_bandit(wikicode):
+	difficulty_total = ""
+	params_list = wikicode.params
+
+	params_list = rename_params(params_list)
+	for param in params_list:
+		if "Location" in param.name:  # change Mission to MissionsList
+			param.name = "MissionsList"
+
+	for diff in ["Newbie", "Rookie", "Trained", "Hardened", "Veteran", "Master"]:
+		difficulty_template = mwparserfromhell.parse("{{SemanticMonsterDifficultyData\n}}").filter_templates()[0]
+
+		difficulty_template.add("Difficulty", diff + "\n")
+
+		# first, move all values to difficulty_template
+		difficulty_template = try_move_values(wikicode, difficulty_template, diff)
+		difficulty_template.add("CP", try_or(lambda: wikicode.get(diff + "CP").value, "\n"))
+
+		# Then remove original values
+		wikicode = remove_original(wikicode, diff)
+
+		difficulty_template = cleanup(difficulty_template)
+
+		difficulty_total = difficulty_total + str(difficulty_template) + "<nowiki/>\n"
 	return wikicode, difficulty_total
