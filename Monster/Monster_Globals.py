@@ -1,7 +1,7 @@
 # whocontributes 07/04/2019
 # pulled from https://wiki.mabinogiworld.com/index.php?title=Special:WhatLinksHere/Template:StyleMonster&namespace=0&limit=500
 FAMILY_PAGES_LIST = ["Bat", "Bear", "Horse", "Dragon", "Ogre (Family)", "Mimic (Family)", "Goblin (Family)", "Wolf",
-					 "Skeleton", "Golem", "Spider",
+					 "Skeleton (Family)", "Golem", "Spider",
 					 "Rat", "Snake", "Kobold", "Troll", "Imp", "Succubus", "Wisp", "Flying Sword", "Gremlin",
 					 "Werewolf", "Rat Man", "Gargoyle", "Raccoon", "Lycanthrope",
 					 "Nightmare Humanoid", "Worm", "Gorgon", "Jackal",

@@ -3,14 +3,13 @@ import difflib
 import getpass
 import re
 import webbrowser
-
 import clipboard
 import mwclient
 import mwparserfromhell
 import Bot
 
 from Monster_Globals import SKILL_BLACKLIST, VALID_SKILLS, CAPITIAL_EACH_WORD, FAMILY_PAGES_LIST, BALTANE_MISSIONS, \
-	NUMERICAL_VALUES, AGGRO_RANGE, AGGRO_SPEED, SPEED, THEATRE_MISSIONS,MULTI_AGGRO
+	NUMERICAL_VALUES, AGGRO_RANGE, AGGRO_SPEED, SPEED, THEATRE_MISSIONS, MULTI_AGGRO
 from Monster_Params_Parser import make_monster_difficulty, try_or
 
 import semigration
@@ -168,6 +167,23 @@ def convert_passive_def(wikicode):
 
 
 ###############
+# Attempts to get the file extension of the monster. Returns "\n" if not found
+###############
+def try_get_file_ext(monster_name):
+	site = mwclient.Site(URL_WIKI_BASE, URL_WIKI_PATH)
+
+	return_me = "\n"
+	for ext in ["jpg", "png"]:  # Old pages have jpg, so check that first
+		filename = "File:{0}.{1}".format(monster_name.strip(), ext)
+		result = site.api("query", titles=filename)
+		for key in result['query']['pages'].keys():
+			if key != '-1':
+				return_me = ext + "\n"
+
+	return return_me
+
+
+###############
 # Processes the parameters,
 # Page-> Family,
 # Skills,
@@ -184,7 +200,9 @@ def process_common_params(wikicode, monster_type, section, current_family):
 	try_or(lambda: wikicode.remove("LocationOverflow"), "")  # no idea what this parameter is used for
 	fileExt = try_or(lambda: wikicode.get("Ext").value, None)
 	if fileExt is None:
-		warning_text = warning_text + "'''When importing data, file extension was not set (|Ext=). Please check output'''<br>"
+		fileExt = try_get_file_ext(try_or(lambda: wikicode.get("Name").value, None))
+		wikicode.add("Ext", fileExt)
+		warning_text = warning_text + "'''When importing data, file extension was not set (|Ext=). We have tried to find the file. Please check output'''<br>"
 
 	wikicode = convert_passive_def(wikicode)
 	params_list = wikicode.params
@@ -295,7 +313,8 @@ def get_ready_wikicode(wikicode, warning_text):
 	# wikicode = wikicode.replace("{{{format}}}", "SemanticMonsterData")
 	if AUTO_UPLOAD:  # auto upload does not need warning text. just print
 		string = str(wikicode) + "{{RenderSemanticMonster}}<nowiki/>\n"
-		print("[WARNING BEFORE UPLOAD] {0}".format(warning_text))
+		print("[REVIEW WARNING BEFORE UPLOAD]\n{0}".format(warning_text))
+		input("Press enter to continue...")
 
 	else:
 		string = str(wikicode) + "{{RenderSemanticMonster}}<nowiki/>\n" + warning_text
