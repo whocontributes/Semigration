@@ -1,14 +1,16 @@
 # whocontributes 07/04/2019
 import difflib
+import getpass
 import re
 import webbrowser
 
 import clipboard
 import mwclient
 import mwparserfromhell
+import Bot
 
 from Monster_Globals import SKILL_BLACKLIST, VALID_SKILLS, CAPITIAL_EACH_WORD, FAMILY_PAGES_LIST, BALTANE_MISSIONS, \
-	NUMERICAL_VALUES, AGGRO_RANGE, AGGRO_SPEED, SPEED, THEATRE_MISSIONS
+	NUMERICAL_VALUES, AGGRO_RANGE, AGGRO_SPEED, SPEED, THEATRE_MISSIONS,MULTI_AGGRO
 from Monster_Params_Parser import make_monster_difficulty, try_or
 
 import semigration
@@ -17,22 +19,34 @@ from semigration.upload import URL_EDIT
 
 warning_text = ""  # any text that needs to be sent to the user for review. For example, "old exp was 165-225. please double check this."
 
+AUTO_UPLOAD = False
+BOT_OBJ = None
+
 
 # Writing down implementation steps so I don't forget
 # main()
-#   a. preprocess_pages()
+#   a. Ask user if they want to auto upload page using API
+#      1. Ask user for credentials to wiki.
+#   b. call process_family()
 #      1. for each family, get templates used in that page.
 #      2. for each template
-#         a. If "StyleMonster" is in this template, then continue
-#         b. Call extract_templates() on Template:DataMonster<monster name>
-#         c. Inside this DataMonster, find the template with {{{format since the first is usually {{Usage}}
-#         d. Call process_params()
+#         i. If "DataMonster" is in this template, then continue
+#      2.1. call process_page()
+#         i. Determine the type of monster, such as Normal/Shadow/Sidhe
+#         ii. Call extract_templates() on Template:DataMonster<monster name>
+#            c.1. Add extra checks for type of mosnter
+#         iii. Inside this DataMonster, find the template with {{{format since the first is usually {{Usage}}
+#            d.1. saves the indexes to delete if it does not have {{{format
+#         iv. Call process_common_params()
 #             Read the if else statements in this function. Pretty much converts parameters to new semantic style
-#         e. Call get_ready_wikicode()
+#         v. Call make_monster_difficulty()
+#             This makes the {{SemanticMonsterDifficultyData rows
+#         vi. Call get_ready_wikicode()
 #             This does some minor string replace, prepending and appending. Does not edit the parameters
-#         f. Call write_files_or_upload()
-#             Ask the user if they want to upload code to wiki or save to good/bad. Cutoff is 70% matching
-#   b. upload_listdir("good") After reviewing the old and new, this function will loop through the good directory and upload to wiki
+#         vii. Call write_files_or_upload()
+#             Ask the user if they want to upload code to wiki or save to file
+#             If global AUTO_UPLOAD is set to true, this will not prompt the user.
+#
 
 
 def myupload(name, contents):
@@ -237,6 +251,9 @@ def process_common_params(wikicode, monster_type, section, current_family):
 				param.value = "Small"
 			param = get_closest(param, AGGRO_RANGE)
 
+		elif param.name == "MultiAggro":
+			param = get_closest(param, MULTI_AGGRO)
+
 		elif "CP" in param.name:  # If CP has a "?", convert to empty string
 			if param.value.strip().lower() == "?":
 				param.value = "\n"
@@ -276,22 +293,28 @@ def process_common_params(wikicode, monster_type, section, current_family):
 ###############
 def get_ready_wikicode(wikicode, warning_text):
 	# wikicode = wikicode.replace("{{{format}}}", "SemanticMonsterData")
+	if AUTO_UPLOAD:  # auto upload does not need warning text. just print
+		string = str(wikicode) + "{{RenderSemanticMonster}}<nowiki/>\n"
+		print("[WARNING BEFORE UPLOAD] {0}".format(warning_text))
 
-	string = str(wikicode) + "{{RenderSemanticMonster}}<nowiki/>\n" + warning_text
+	else:
+		string = str(wikicode) + "{{RenderSemanticMonster}}<nowiki/>\n" + warning_text
 	i = string.index('\n')
 	new_string = "{{SemanticMonsterData" + string[i:]
 	return mwparserfromhell.parse(new_string)
 
 
 def write_files_or_upload(current_monster_name, ready_wikicode):
-	value = ""
-	while value == "":
-		value = input("Do you want to upload now? [%s](y/n) " % current_monster_name)
-	if value.lower() == "y":
-		myupload(current_monster_name, str(ready_wikicode))
-
+	if AUTO_UPLOAD:
+		BOT_OBJ.edit_and_save(current_monster_name, ready_wikicode)
 	else:
-		write_files(current_monster_name, ready_wikicode)
+		value = ""
+		while value == "":
+			value = input("Do you want to upload now? [{0}](y/n) ".format(current_monster_name))
+		if value.lower() == "y":
+			myupload(current_monster_name, str(ready_wikicode))
+		else:
+			write_files(current_monster_name, ready_wikicode)
 
 
 ###############
@@ -304,11 +327,12 @@ def write_files(current_monster_name, ready_wikicode):
 	print("Wrote to file")
 
 
-def preprocess_pages():
+def process_family():
 	global warning_text
 	# for each family, get the templates used.
 
 	for current_family in FAMILY_PAGES_LIST:
+		Bot.check_matching_name(current_family)
 		current_page = semigration.parse(current_family)
 		for key, value in current_page.headers.items():
 			section = key
@@ -317,61 +341,63 @@ def preprocess_pages():
 					warning_text = ""  # reset before process monster
 
 					if "DataMonster" in str(item):  # again ignore non DataMonster templates, like enchants
-						monster_type = "Normal"
-						if "StyleShadowMonster" in str(item['format']):
-							monster_type = "Shadow"
-						elif "StyleLordMonster" in str(item['format']):
-							monster_type = "Lord"
-						elif "StyleFinnachaidMonster" in str(item['format']):
-							monster_type = "Sidhe"
-						elif "StyleBandit" in str(item['format']):
-							monster_type = "Bandit"
-						elif "StyleAlban Dungeon Monster," in str(item['format']):
-							monster_type = "Alban"
-						elif "Raid Dungeon Monster" in str(item["format"]):
-							monster_type = "Raid"
+						process_page(current_family, item, section)
 
-						current_monster_name = str(item.name).replace("DataMonster", "")
-						current_data_monster_templates_list = extract_templates("Template:" + str(item.name))
+		if AUTO_UPLOAD:
+			input("Finished family [{0}]. Waiting for user".format(current_family))
 
-						if monster_type == "Shadow" and "Lord" in str(current_data_monster_templates_list):
-							print("[WARNING] Lord monster detected. Please confirm output.")
-							monster_type = "Lord"
-						elif monster_type == "Shadow" and any(
-								balt_mission in str(current_data_monster_templates_list) for balt_mission in
-								BALTANE_MISSIONS):
-							print("[WARNING] Baltane monster detected. Please confirm output.")
-							monster_type = "Baltane"
-						elif monster_type == "Shadow" and any(
-								theatre in str(current_data_monster_templates_list) for theatre in
-								THEATRE_MISSIONS):
-							print("[WARNING] Theatre monster detected. Please confirm output.")
-							monster_type = "Theatre"
-						elif "Finnachaid" in str(current_data_monster_templates_list):
-							print("[WARNING] Sidhe Finnachaid monster detected. Please confirm output.")
-							monster_type = "Sidhe"
 
-						param_done_wikicode = ""
-						indexes_to_delete = []
-						# Now we search for the {{{format}}} template
-						for i, wikicode in enumerate(current_data_monster_templates_list):
-							if "{{{format" in str(wikicode.name):
-								param_done_wikicode = process_common_params(
-									wikicode, monster_type, section, current_family)
-							elif "times" in str(wikicode.name):
-								pass  # keep template times
-							else:
-								indexes_to_delete.append(i)
+def process_page(current_family, item, section):
+	monster_type = "Normal"
+	if "StyleShadowMonster" in str(item['format']):
+		monster_type = "Shadow"
+	elif "StyleLordMonster" in str(item['format']):
+		monster_type = "Lord"
+	elif "StyleFinnachaidMonster" in str(item['format']):
+		monster_type = "Sidhe"
+	elif "StyleBandit" in str(item['format']):
+		monster_type = "Bandit"
+	elif "StyleAlban Dungeon Monster," in str(item['format']):
+		monster_type = "Alban"
+	elif "Raid Dungeon Monster" in str(item["format"]):
+		monster_type = "Raid"
+	current_monster_name = str(item.name).replace("DataMonster", "")
+	current_data_monster_templates_list = extract_templates("Template:" + str(item.name))
+	if monster_type == "Shadow" and "Lord" in str(current_data_monster_templates_list):
+		print("[WARNING] Lord monster detected. Please confirm output.")
+		monster_type = "Lord"
+	elif monster_type == "Shadow" and any(
+			balt_mission in str(current_data_monster_templates_list) for balt_mission in
+			BALTANE_MISSIONS):
+		print("[WARNING] Baltane monster detected. Please confirm output.")
+		monster_type = "Baltane"
+	elif monster_type == "Shadow" and any(
+			theatre in str(current_data_monster_templates_list) for theatre in
+			THEATRE_MISSIONS):
+		print("[WARNING] Theatre monster detected. Please confirm output.")
+		monster_type = "Theatre"
+	elif "Finnachaid" in str(current_data_monster_templates_list):
+		print("[WARNING] Sidhe Finnachaid monster detected. Please confirm output.")
+		monster_type = "Sidhe"
+	param_done_wikicode = ""
+	indexes_to_delete = []
+	# Now we search for the {{{format}}} template
+	for i, wikicode in enumerate(current_data_monster_templates_list):
+		if "{{{format" in str(wikicode.name):
+			param_done_wikicode = process_common_params(
+				wikicode, monster_type, section, current_family)
+		elif "times" in str(wikicode.name):
+			pass  # keep template times
+		else:
+			indexes_to_delete.append(i)
+	for idx in indexes_to_delete:  # remove any non {{{format from list
+		del current_data_monster_templates_list[idx]
+	if param_done_wikicode != "":
+		wikicode_with_monster_difficulty = make_monster_difficulty(param_done_wikicode,
+																   monster_type)
+		ready_wikicode = get_ready_wikicode(wikicode_with_monster_difficulty, warning_text)
 
-						for idx in indexes_to_delete:  # remove any non {{{format from list
-							del current_data_monster_templates_list[idx]
-
-						if param_done_wikicode != "":
-							wikicode_with_monster_difficulty = make_monster_difficulty(param_done_wikicode,
-																					   monster_type)
-							ready_wikicode = get_ready_wikicode(wikicode_with_monster_difficulty, warning_text)
-
-							write_files_or_upload(current_monster_name, ready_wikicode)
+		write_files_or_upload(current_monster_name, ready_wikicode)
 
 
 def process_file(filepath, page_name):
@@ -393,8 +419,20 @@ def upload_listdir(directory):
 	print("d")
 
 
+def ask_auto_upload():
+	global AUTO_UPLOAD, BOT_OBJ
+
+	value = input("Do you want to auto upload? (y/n) ")
+	if value.lower() == "y":
+		AUTO_UPLOAD = True
+		USERNAME = input("What is your mabi wiki username? ")
+		PASSWORD = getpass.getpass("What is your mabi wiki password? ")
+		BOT_OBJ = Bot.Bot(USERNAME, PASSWORD)
+
+
 def main():
-	preprocess_pages()
+	ask_auto_upload()
+	process_family()
 
 
 # upload_listdir("output")

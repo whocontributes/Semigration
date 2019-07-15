@@ -1,6 +1,7 @@
 # whocontributes 07/04/2019
 # pulled from https://wiki.mabinogiworld.com/index.php?title=Special:WhatLinksHere/Template:StyleMonster&namespace=0&limit=500
-FAMILY_PAGES_LIST = ["Bat", "Bear", "Horse", "Dragon", "Ogre (Family)", "Mimic (Family)", "Goblin (Family)", "Wolf", "Skeleton", "Golem", "Spider",
+FAMILY_PAGES_LIST = ["Bat", "Bear", "Horse", "Dragon", "Ogre (Family)", "Mimic (Family)", "Goblin (Family)", "Wolf",
+					 "Skeleton", "Golem", "Spider",
 					 "Rat", "Snake", "Kobold", "Troll", "Imp", "Succubus", "Wisp", "Flying Sword", "Gremlin",
 					 "Werewolf", "Rat Man", "Gargoyle", "Raccoon", "Lycanthrope",
 					 "Nightmare Humanoid", "Worm", "Gorgon", "Jackal",
@@ -144,3 +145,4 @@ THEATRE_MISSIONS = ["The New King's Request", "Guardian of Avon", "Fortinbras's 
 SPEED = ["Very Slow", "Slow", "Medium", "Fast", "Very Fast", "Immobile", ""]
 AGGRO_SPEED = ["Very Slow", "Slow", "Medium", "Fast", "Very Fast", "Instant", "None", ""]
 AGGRO_RANGE = ["Very Small", "Small", "Medium", "Far", "Very Far", "Extremely Far", "None", ""]
+MULTI_AGGRO = ["n", "y", "1", "2", "3", "4", "5"]
