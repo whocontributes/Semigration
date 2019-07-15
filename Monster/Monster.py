@@ -47,7 +47,7 @@ def myupload(name, contents):
 def extract_templates(page=None, *, text=None):
 	if text is None:
 		site = mwclient.Site(URL_WIKI_BASE, URL_WIKI_PATH)
-		text = site.pages[page].text()
+		text = site.pages[page].resolve_redirect().text()
 
 	return mwparserfromhell.parse(text).filter_templates()
 
@@ -163,7 +163,7 @@ def convert_passive_def(wikicode):
 # Aggro -> true or false
 # Element: Unknown -> empty string
 ###############
-def process_common_params(wikicode, monster_type, section):
+def process_common_params(wikicode, monster_type, section, current_family):
 	global warning_text
 
 	try_or(lambda: wikicode.remove("DropsOverflow"), "")  # no idea what this parameter is used for
@@ -196,8 +196,9 @@ def process_common_params(wikicode, monster_type, section):
 		if "Page" in param.name:  # change Page to Family
 			# param = mwparserfromhell.parse(param.replace("Page", "Family"))
 			param.name = "Family"
-		elif "Skill" in param.name and not any(
-				name in param.name for name in SKILL_BLACKLIST):  # push skills into a list
+			param.value = current_family + "\n"
+		elif "Skill" in param.name and ("AdvancedHeavyStander" in param.name or not any(
+				name in param.name for name in SKILL_BLACKLIST)):  # push skills into a list
 			if param.value.strip().lower() == "y":
 				just_skill = str(param.name).replace("Skill", "")
 				if just_skill == "Counter":
@@ -211,6 +212,9 @@ def process_common_params(wikicode, monster_type, section):
 
 			params_to_remove.append(
 				param)  # add to separate list  since deleting now will remove a node and change indexes. Messes up for loop
+
+			if "AdvancedHeavyStander" in param.name:
+				warning_text = warning_text + "''Manually add Adv heavy stander to skill list'''<br>"
 		elif param.name == "Speed":
 			if str(param.value).strip() == "Average" or str(param.value).strip() == "Normal":
 				param.value = "Medium"
@@ -220,6 +224,8 @@ def process_common_params(wikicode, monster_type, section):
 				param.value = "Medium"
 			if str(param.value).strip() == "Small":
 				param.value = "Slow"
+			if str(param.value).strip() == "Far":
+				param.value = "Fast"
 			param = get_closest(param, AGGRO_SPEED)
 
 		elif param.name == "AggroRange":
@@ -351,7 +357,7 @@ def preprocess_pages():
 						for i, wikicode in enumerate(current_data_monster_templates_list):
 							if "{{{format" in str(wikicode.name):
 								param_done_wikicode = process_common_params(
-									wikicode, monster_type, section)
+									wikicode, monster_type, section, current_family)
 							elif "times" in str(wikicode.name):
 								pass  # keep template times
 							else:
