@@ -124,7 +124,8 @@ def convert_passive_def(wikicode):
 	NS = try_or(lambda: wikicode.get("SkillNaturalShield").value.strip(), "0")
 	bool_convert = False
 
-	if HS.isalpha() or MD.isalpha() or NS.isalpha():  # if there is A-F
+	if HS.isalpha() or len(HS) == 0 or MD.isalpha() or len(MD) == 0 or NS.isalpha() or len(
+			NS) == 0:  # if there is A-F. len == 0 is for empty string
 		bool_convert = True
 	else:
 		if int(HS) > 3 or int(MD) > 3 or int(NS) > 3:  # if there is 4-9
@@ -135,30 +136,36 @@ def convert_passive_def(wikicode):
 	try_or(lambda: wikicode.remove("SkillNaturalShield"), "")
 
 	if bool_convert:
-		if HS.isalpha():  # A-F is 1
-			wikicode.add("SkillHeavyStander", "1")
-		else:
-			if int(HS) > 1:  # 2-9 is 2
-				wikicode.add("SkillHeavyStander", "2")
-			elif int(HS) == 1:
-				wikicode.add("SkillHeavyStander", "3")  # rank 1 is level 3. If value is 0, monster does not have def
+		if len(HS) != 0:  # Add values if there is NOT an empty string
+			if HS.isalpha():  # A-F is 1
+				wikicode.add("SkillHeavyStander", "1")
+			else:
+				if int(HS) > 1:  # 2-9 is 2
+					wikicode.add("SkillHeavyStander", "2")
+				elif int(HS) == 1:
+					wikicode.add("SkillHeavyStander",
+								 "3")  # rank 1 is level 3. If value is 0, monster does not have def
 
-		if MD.isalpha():  # A-F is 1
-			wikicode.add("SkillManaDeflector", "1")
-		else:
-			if int(MD) > 1:  # 2-9 is 2
-				wikicode.add("SkillManaDeflector", "2")
-			elif int(MD) == 1:
-				wikicode.add("SkillManaDeflector", "3")  # rank 1 is level 3. If value is 0, monster does not have def
+		if len(MD) != 0:  # Add values if there is NOT an empty string
+			if MD.isalpha():  # A-F is 1
+				wikicode.add("SkillManaDeflector", "1")
+			else:
+				if int(MD) > 1:  # 2-9 is 2
+					wikicode.add("SkillManaDeflector", "2")
+				elif int(MD) == 1:
+					wikicode.add("SkillManaDeflector",
+								 "3")  # rank 1 is level 3. If value is 0, monster does not have def
 
-		if NS.isalpha():  # A-F is 1
-			wikicode.add("SkillNaturalShield", "1")
-		else:
-			if int(NS) > 1:  # 2-9 is 2
-				wikicode.add("SkillNaturalShield", "2")
-			elif int(NS) == 1:
-				wikicode.add("SkillNaturalShield", "3")  # rank 1 is level 3. If value is 0, monster does not have def
-	else:
+		if len(NS) != 0:  # Add values if there is NOT an empty string
+			if NS.isalpha():  # A-F is 1
+				wikicode.add("SkillNaturalShield", "1")
+			else:
+				if int(NS) > 1:  # 2-9 is 2
+					wikicode.add("SkillNaturalShield", "2")
+				elif int(NS) == 1:
+					wikicode.add("SkillNaturalShield",
+								 "3")  # rank 1 is level 3. If value is 0, monster does not have def
+	else:  # reuse values
 		if int(HS) != 0: wikicode.add("SkillHeavyStander", HS)
 		if int(MD) != 0: wikicode.add("SkillManaDeflector", MD)
 		if int(NS) != 0: wikicode.add("SkillNaturalShield", NS)
@@ -309,11 +316,12 @@ def process_common_params(wikicode, monster_type, section, current_family):
 # Performs string replacement and appends text
 #    to make page ready for new semantic form
 ###############
-def get_ready_wikicode(wikicode, warning_text):
+def get_ready_wikicode(wikicode):
 	# wikicode = wikicode.replace("{{{format}}}", "SemanticMonsterData")
 	if AUTO_UPLOAD:  # auto upload does not need warning text. just print
 		string = str(wikicode) + "{{RenderSemanticMonster}}<nowiki/>\n"
-		print("[REVIEW WARNING BEFORE UPLOAD]\n{0}".format(warning_text))
+		monster_name = try_or(lambda: wikicode.filter_templates()[0].get("Name"), "\n")
+		print("[REVIEW WARNING BEFORE UPLOAD] {0}{1}".format(monster_name, warning_text.replace("<br>", "\n   ")))
 		input("Press enter to continue...")
 
 	else:
@@ -349,8 +357,8 @@ def write_files(current_monster_name, ready_wikicode):
 def process_family():
 	global warning_text
 	# for each family, get the templates used.
-
 	for current_family in FAMILY_PAGES_LIST:
+		made_changes = False
 		Bot.check_matching_name(current_family)
 		current_page = semigration.parse(current_family)
 		for key, value in current_page.headers.items():
@@ -361,8 +369,9 @@ def process_family():
 
 					if "DataMonster" in str(item):  # again ignore non DataMonster templates, like enchants
 						process_page(current_family, item, section)
+						made_changes = True
 
-		if AUTO_UPLOAD:
+		if AUTO_UPLOAD and made_changes:
 			input("Finished family [{0}]. Waiting for user".format(current_family))
 
 
@@ -382,7 +391,9 @@ def process_page(current_family, item, section):
 		monster_type = "Raid"
 	current_monster_name = str(item.name).replace("DataMonster", "")
 	current_data_monster_templates_list = extract_templates("Template:" + str(item.name))
-	if monster_type == "Shadow" and "Lord" in str(current_data_monster_templates_list):
+	if monster_type == "Shadow" and any(
+			"|Lord" + stat in str(current_data_monster_templates_list) for stat in
+			NUMERICAL_VALUES):
 		print("[WARNING] Lord monster detected. Please confirm output.")
 		monster_type = "Lord"
 	elif monster_type == "Shadow" and any(
@@ -414,7 +425,7 @@ def process_page(current_family, item, section):
 	if param_done_wikicode != "":
 		wikicode_with_monster_difficulty = make_monster_difficulty(param_done_wikicode,
 																   monster_type)
-		ready_wikicode = get_ready_wikicode(wikicode_with_monster_difficulty, warning_text)
+		ready_wikicode = get_ready_wikicode(wikicode_with_monster_difficulty)
 
 		write_files_or_upload(current_monster_name, ready_wikicode)
 
