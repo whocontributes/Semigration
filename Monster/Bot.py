@@ -16,7 +16,7 @@ class Bot(object):
 		page = self.session.Pages[page_name]
 
 		page.save(str(wikitext), summary='Semanticfied monster. Please check my work!')
-		print("[BOT] Saved monster %s. Sleeping for 5 seconds" % page_name)
+		print("[BOT] Saved monster %s. Sleeping for 5 seconds\n===\n" % page_name)
 		time.sleep(5)
 
 ###############
@@ -30,3 +30,8 @@ def check_matching_name(current_family):
 	if "{{DataMonster{0}|format".format(current_family) in text:
 		print("Possible monster that exists under {0} family".format(current_family))
 		exit(1)
+	result = site.api("query", titles="Template:DataMonster{0}".format(current_family))
+	for key in result['query']['pages'].keys():
+		if key != '-1':
+			print("Possible monster that exists under {0} family".format(current_family))
+			exit(1)

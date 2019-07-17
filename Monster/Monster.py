@@ -9,7 +9,7 @@ import mwparserfromhell
 import Bot
 
 from Monster_Globals import SKILL_BLACKLIST, VALID_SKILLS, CAPITIAL_EACH_WORD, FAMILY_PAGES_LIST, BALTANE_MISSIONS, \
-	NUMERICAL_VALUES, AGGRO_RANGE, AGGRO_SPEED, SPEED, THEATRE_MISSIONS, MULTI_AGGRO
+	NUMERICAL_VALUES, AGGRO_RANGE, AGGRO_SPEED, SPEED, THEATRE_MISSIONS, MULTI_AGGRO, ELEMENT
 from Monster_Params_Parser import make_monster_difficulty, try_or
 
 import semigration
@@ -93,26 +93,26 @@ def yes_no(param):
 
 
 ###############
-# From the gold value, try to split using dash and return min and max. If failed, set to 0.
+# From the gold value, try to split using dash and return min and max. If failed, set to "\n" for unknown
 ###############
 def convert_gold(param_name, value):
 	global warning_text
-	min = 0
-	max = 0
+	min = "\n"
+	max = "\n"
 	value = value.replace('~', '-')
 	gold_list = value.split("-")
 	if len(gold_list) == 2:
-		min = try_or(lambda: int(gold_list[0].replace(',', '')), 0)
-		max = try_or(lambda: int(gold_list[1].replace(',', '')), 0)
+		min = try_or(lambda: int(gold_list[0].replace(',', '')), "\n")
+		max = try_or(lambda: int(gold_list[1].replace(',', '')), "\n")
 	else:
-		min = try_or(lambda: int(gold_list[0].replace('+', '').replace(',', '')), 0)
-	if min == 0 or max == 0:
+		min = try_or(lambda: int(gold_list[0].replace('+', '').replace(',', '')), "\n")
+	if min == "\n" or max == "\n":
 		warning_text = warning_text + "'''When importing data, old parameter [{0}] was '{1}'. Please manually check output'''<br>".format(
 			param_name, value.strip())
 	return min, max
 
 
-NUMBERS_ONLY = re.compile(r'[^0-9]')
+NUMBERS_ONLY = re.compile(r'[^0-9.]')
 
 
 ###############
@@ -128,7 +128,8 @@ def convert_passive_def(wikicode):
 			NS) == 0:  # if there is A-F. len == 0 is for empty string
 		bool_convert = True
 	else:
-		if int(HS) > 3 or int(MD) > 3 or int(NS) > 3:  # if there is 4-9
+		if (HS.isdigit() and int(HS) > 3) or (MD.isdigit() and int(MD) > 3) or (
+				NS.isdigit() and int(NS) > 3):  # if there is 4-9
 			bool_convert = True
 
 	try_or(lambda: wikicode.remove("SkillHeavyStander"), "")
@@ -166,6 +167,10 @@ def convert_passive_def(wikicode):
 					wikicode.add("SkillNaturalShield",
 								 "3")  # rank 1 is level 3. If value is 0, monster does not have def
 	else:  # reuse values
+		# if we cannot convert to int, just set to 1. letters have already been processed so this covers special characters
+		HS = try_or(lambda: int(HS), "1")
+		MD = try_or(lambda: int(MD), "1")
+		NS = try_or(lambda: int(NS), "1")
 		if int(HS) != 0: wikicode.add("SkillHeavyStander", HS)
 		if int(MD) != 0: wikicode.add("SkillManaDeflector", MD)
 		if int(NS) != 0: wikicode.add("SkillNaturalShield", NS)
@@ -223,7 +228,7 @@ def process_common_params(wikicode, monster_type, section, current_family):
 		if param.name != "SkillDefense" and any(name in param.name for name in
 												NUMERICAL_VALUES):  # drop any non numerical values. Since skill and stats def is same, we need to remove that from check
 			old_param_value = str(param.value)
-			list_value_split = str(param.value).replace('.', ' ').replace('-', ' ').replace('(', ' ').replace('~',
+			list_value_split = str(param.value).replace('-', ' ').replace('(', ' ').replace('~',
 																											  ' ').split()  # check for dashes, tildes,spaces
 			if len(list_value_split) >= 2:
 				param.value = NUMBERS_ONLY.sub('', str(list_value_split[0])) + "\n"
@@ -257,13 +262,15 @@ def process_common_params(wikicode, monster_type, section, current_family):
 		elif param.name == "Speed":
 			if str(param.value).strip() == "Average" or str(param.value).strip() == "Normal":
 				param.value = "Medium"
+			if str(param.value).strip() == "Above Average":
+				param.value = "Fast"
 			param = get_closest(param, SPEED)
 		elif param.name == "AggroSpeed":
 			if str(param.value).strip() == "Average" or str(param.value).strip() == "Normal":
 				param.value = "Medium"
 			if str(param.value).strip() == "Small":
 				param.value = "Slow"
-			if str(param.value).strip() == "Far":
+			if str(param.value).strip() == "Far" or str(param.value).strip() == "Above Average" :
 				param.value = "Fast"
 			param = get_closest(param, AGGRO_SPEED)
 
@@ -287,8 +294,11 @@ def process_common_params(wikicode, monster_type, section, current_family):
 		elif param.name == "Aggro":
 			param = yes_no(param)
 		elif param.name == "Element":
-			if param.value.strip().lower() == "Unknown":
+			if param.value.strip().lower() == "unknown":
 				param.value = "\n"
+
+			param = get_closest(param, ELEMENT)
+
 		elif "Gold" in param.name and ("GoldMin" not in param.name and "GoldMax" not in param.name):
 			params_to_remove.append(param)
 			min, max = convert_gold(str(param.name), str(param.value))
@@ -359,11 +369,13 @@ def process_family():
 	# for each family, get the templates used.
 	for current_family in FAMILY_PAGES_LIST:
 		made_changes = False
-		Bot.check_matching_name(current_family)
+		# Bot.check_matching_name(current_family)
 		current_page = semigration.parse(current_family)
 		for key, value in current_page.headers.items():
 			section = key
 			if "DataMonster" in str(value.templates):  # ignore sections without DataMonster "general information"
+				Bot.check_matching_name(
+					current_family)  # moved check down here. Prevents checking already processed families
 				for item in value.templates:
 					warning_text = ""  # reset before process monster
 
@@ -385,7 +397,7 @@ def process_page(current_family, item, section):
 		monster_type = "Sidhe"
 	elif "StyleBandit" in str(item['format']):
 		monster_type = "Bandit"
-	elif "StyleAlban Dungeon Monster," in str(item['format']):
+	elif "StyleAlban Dungeon Monster" in str(item['format']):
 		monster_type = "Alban"
 	elif "Raid Dungeon Monster" in str(item["format"]):
 		monster_type = "Raid"
@@ -409,6 +421,11 @@ def process_page(current_family, item, section):
 	elif "Finnachaid" in str(current_data_monster_templates_list):
 		print("[WARNING] Sidhe Finnachaid monster detected. Please confirm output.")
 		monster_type = "Sidhe"
+	elif "Alban" in  str(current_data_monster_templates_list):
+		print("[WARNING] Alban monster detected. Please confirm output.")
+		monster_type = "Alban"
+
+
 	param_done_wikicode = ""
 	indexes_to_delete = []
 	# Now we search for the {{{format}}} template
@@ -420,7 +437,7 @@ def process_page(current_family, item, section):
 			pass  # keep template times
 		else:
 			indexes_to_delete.append(i)
-	for idx in indexes_to_delete:  # remove any non {{{format from list
+	for idx in reversed(indexes_to_delete):  # remove any non {{{format from list
 		del current_data_monster_templates_list[idx]
 	if param_done_wikicode != "":
 		wikicode_with_monster_difficulty = make_monster_difficulty(param_done_wikicode,
