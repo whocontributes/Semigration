@@ -15,6 +15,7 @@ def try_or(fn, default):
 
 ###############
 # Remove unknown values since they have just a new line
+# Sets param.value to empty string as well if certain conditions are met
 ###############
 def cleanup(wikicode):
 	params_list = wikicode.params
@@ -24,6 +25,8 @@ def cleanup(wikicode):
 		result = NEW_LINES.match(str(param.value))
 		if result:
 			params_to_remove.append(param)
+		if param.value is not None:
+			param.value = str(param.value).replace("*None", "").replace("?", "").replace("-", "")
 
 	for param in params_to_remove:  # remove after the loop since delete a node changes index
 		params_list.remove(param)
@@ -95,7 +98,8 @@ def make_monster_difficulty(wikicode, monster_type):
 		field = try_or(lambda: wikicode.get("FieldLocations").value, "").strip()
 
 		difficulty_template.add("Locations",
-								str(dungeon).replace("*None", "") + "\n" + str(field).replace("*None", "") + "\n")
+								str(dungeon).replace("*None", "").replace("None", "") + "\n" + str(field).replace(
+									"*None", "").replace("None", "") + "\n")
 
 		difficulty_template.add("Difficulty", "\n")
 
@@ -315,6 +319,7 @@ def process_params_theatre(wikicode):
 		difficulty_total = difficulty_total + str(difficulty_template) + "<nowiki/>\n"
 	return wikicode, difficulty_total
 
+
 ###############
 # Manually adds data for {{SemanticMonsterDifficultyData template for alban monsters
 ###############
@@ -343,4 +348,3 @@ def process_params_alban(wikicode):
 
 		difficulty_total = difficulty_total + str(difficulty_template) + "<nowiki/>\n"
 	return wikicode, difficulty_total
-

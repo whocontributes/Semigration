@@ -113,6 +113,7 @@ def convert_gold(param_name, value):
 
 
 NUMBERS_ONLY = re.compile(r'[^0-9.]')
+CAMEL_CONVERT = re.compile(r"([a-z])([A-Z])")
 
 
 ###############
@@ -229,7 +230,7 @@ def process_common_params(wikicode, monster_type, section, current_family):
 												NUMERICAL_VALUES):  # drop any non numerical values. Since skill and stats def is same, we need to remove that from check
 			old_param_value = str(param.value)
 			list_value_split = str(param.value).replace('-', ' ').replace('(', ' ').replace('~',
-																											  ' ').split()  # check for dashes, tildes,spaces
+																							' ').split()  # check for dashes, tildes,spaces
 			if len(list_value_split) >= 2:
 				param.value = NUMBERS_ONLY.sub('', str(list_value_split[0])) + "\n"
 				warning_text = warning_text + "'''When importing data, old parameter [{0}] was '{1}'. It has been assigned to be '{2}'.'''<br>".format(
@@ -251,8 +252,14 @@ def process_common_params(wikicode, monster_type, section, current_family):
 					just_skill = "Flight (Monster Skill)"
 				if just_skill == "DragonDashAttack":
 					just_skill = "Smack"
+				just_skill = CAMEL_CONVERT.sub("\g<1> \g<2>", just_skill)
 				closest_skill_list = difflib.get_close_matches(just_skill, VALID_SKILLS)
-				skills_list.append(closest_skill_list[0])
+				if len(closest_skill_list) > 0:
+					skills_list.append(closest_skill_list[0])
+				else:
+					warning_text = warning_text + "'''When importing data, skill [{0}] was not found'''<br>".format(
+						just_skill)
+					skills_list.append(just_skill)
 
 			params_to_remove.append(
 				param)  # add to separate list  since deleting now will remove a node and change indexes. Messes up for loop
@@ -270,13 +277,15 @@ def process_common_params(wikicode, monster_type, section, current_family):
 				param.value = "Medium"
 			if str(param.value).strip() == "Small":
 				param.value = "Slow"
-			if str(param.value).strip() == "Far" or str(param.value).strip() == "Above Average" :
+			if str(param.value).strip() == "Far" or str(param.value).strip() == "Above Average":
 				param.value = "Fast"
 			param = get_closest(param, AGGRO_SPEED)
 
 		elif param.name == "AggroRange":
 			if str(param.value).strip() == "Average" or str(param.value).strip() == "Normal":
 				param.value = "Medium"
+			if str(param.value).strip() == "Unlimited" or str(param.value).strip() == "Instant":
+				param.value = "Extremely Far"
 			if str(param.value).strip() == "Wide":
 				param.value = "Far"
 			if str(param.value).strip() == "Short":
@@ -374,8 +383,17 @@ def process_family():
 		for key, value in current_page.headers.items():
 			section = key
 			if "DataMonster" in str(value.templates):  # ignore sections without DataMonster "general information"
-				Bot.check_matching_name(
+				ret = Bot.check_matching_name(
 					current_family)  # moved check down here. Prevents checking already processed families
+				if AUTO_UPLOAD and ret:
+					value = input("Do you want to auto move? [{0}](y/n) ".format(current_family))
+					if value.lower() == "y":
+						BOT_OBJ.move_family(current_family)
+						print("Please update the monster globals")
+
+				if ret:  # no auto upload, so exit
+					exit(1)
+
 				for item in value.templates:
 					warning_text = ""  # reset before process monster
 
@@ -421,10 +439,9 @@ def process_page(current_family, item, section):
 	elif "Finnachaid" in str(current_data_monster_templates_list):
 		print("[WARNING] Sidhe Finnachaid monster detected. Please confirm output.")
 		monster_type = "Sidhe"
-	elif "Alban" in  str(current_data_monster_templates_list):
+	elif "Alban" in str(current_data_monster_templates_list):
 		print("[WARNING] Alban monster detected. Please confirm output.")
 		monster_type = "Alban"
-
 
 	param_done_wikicode = ""
 	indexes_to_delete = []
