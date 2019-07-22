@@ -386,8 +386,8 @@ def process_family():
 				ret = Bot.check_matching_name(
 					current_family)  # moved check down here. Prevents checking already processed families
 				if AUTO_UPLOAD and ret:
-					value = input("Do you want to auto move? [{0}](y/n) ".format(current_family))
-					if value.lower() == "y":
+					user_in = input("Do you want to auto move? [{0}](y/n) ".format(current_family))
+					if user_in.lower() == "y":
 						BOT_OBJ.move_family(current_family)
 						print("Please update the monster globals")
 
@@ -483,6 +483,64 @@ def upload_listdir(directory):
 	print("d")
 
 
+###############
+# 1. Loop through all families
+# 2. if monster is detected, mark boolean to true
+# 3. Counter number of DataMonster.
+#    3.1 If number is =1, print out will not move family. append to separate list
+#    3.2 If number is >1, move to family page
+# 4. when done print out new list(s) so user can update globals
+# 5. exit program
+###############
+def ask_auto_move():
+	global FAMILY_PAGES_LIST
+	FAMILY_PAGES_LIST = sorted(FAMILY_PAGES_LIST)
+	value = input("Do you want to auto move families? (y/n) ")
+	if value.lower() == "y":
+		USERNAME = input("What is your mabi wiki username? ")
+		PASSWORD = getpass.getpass("What is your mabi wiki password? ")
+		bot = Bot.Bot(USERNAME, PASSWORD)
+		new_family_list = []
+		moved_list = []
+		one_monster_page_list = []
+
+		for current_family in FAMILY_PAGES_LIST:
+			print("[AUTO MOVE] Checking {0}".format(current_family))
+			current_page = semigration.parse(current_family)
+			need_to_move = False
+			current_family_count = 0
+			for key, value in current_page.headers.items():
+				section = key
+				if "DataMonster" in str(value.templates):  # ignore sections without DataMonster "general information"
+					ret = Bot.check_matching_name(
+						current_family)
+
+					if ret or need_to_move:
+						need_to_move = True
+						for item in value.templates:
+
+							if "DataMonster" in str(item):  # again ignore non DataMonster templates, like enchants
+								current_family_count = current_family_count + 1
+			if need_to_move:
+				if current_family_count == 1:
+					print(" [WILL NOT MOVE] {0}, since there is only one monster".format(current_family))
+					one_monster_page_list.append(current_family)
+				if current_family_count > 1:
+					bot.move_family(current_family)
+					# print("   [DRY RUN] Moving {0}".format(current_family))
+					moved_list.append(current_family)
+					current_family = current_family + " (Family)"
+			if current_family_count != 1:  # those with one have a different list
+				new_family_list.append(current_family)
+
+		print("new list = " + str(new_family_list))
+		print("moved list = " + str(moved_list))
+		print("one monster list = " + str(one_monster_page_list))
+		print("Please update globals")
+		print("We found {0} possible new family pages".format(len(moved_list)))
+		exit(1)
+
+
 def ask_auto_upload():
 	global AUTO_UPLOAD, BOT_OBJ
 
@@ -495,6 +553,7 @@ def ask_auto_upload():
 
 
 def main():
+	ask_auto_move()
 	ask_auto_upload()
 	process_family()
 
