@@ -26,7 +26,12 @@ def cleanup(wikicode):
 		if result:
 			params_to_remove.append(param)
 		if param.value is not None:
-			param.value = str(param.value).replace("*None", "").replace("?", "").replace("-", "")
+			if param.value.strip() == "*None":
+				param.value = str(param.value).replace("*None", "")
+			if param.value.strip() == "?":
+				param.value = str(param.value).replace("?", "")
+			if param.value.strip() == "-":
+				param.value = str(param.value).replace("-", "")
 
 	for param in params_to_remove:  # remove after the loop since delete a node changes index
 		params_list.remove(param)
