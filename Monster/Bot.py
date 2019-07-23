@@ -28,6 +28,21 @@ class Bot(object):
 		print("[BOT] Moved to new family page. %s Sleeping for 5 seconds\n===\n" % (page_name + " (Family)"))
 		time.sleep(5)
 
+	###############
+	# section_list is a list of dicts with ["name"] and ["id"] as keys
+	###############
+	def update_family_to_semantic(self, page_name, section_list):
+		page = self.session.Pages[page_name]
+
+		for section in section_list:
+			template = "QueryMonsters\n|Family={0}\n|Section={1}""".format(page_name, section["name"])
+			template = "==" + section["name"] + "==\n{{" + template + "}}"
+			page.save(template, summary="Moved section {0} to semantic. Please check my work!".format(section["name"]), section=section["id"])
+
+		print("[BOT] Updated family page to semantic. %s Sleeping for 5 seconds\n===\n" % page_name)
+		time.sleep(5)
+		page.purge()
+
 
 ###############
 # Checks to see if the current family is an actual monster.

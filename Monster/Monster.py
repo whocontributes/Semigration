@@ -45,6 +45,7 @@ BOT_OBJ = None
 #         vii. Call write_files_or_upload()
 #             Ask the user if they want to upload code to wiki or save to file
 #             If global AUTO_UPLOAD is set to true, this will not prompt the user.
+#         viii. If AUTO_UPLOAD is true, script will also auto update family pages to semantic calls
 #
 
 
@@ -380,8 +381,11 @@ def process_family():
 		made_changes = False
 		# Bot.check_matching_name(current_family)
 		current_page = semigration.parse(current_family)
+		sections_list = []
+		current_section_id = 0
 		for key, value in current_page.headers.items():
 			section = key
+			current_section_id = current_section_id + 1
 			if "DataMonster" in str(value.templates):  # ignore sections without DataMonster "general information"
 				ret = Bot.check_matching_name(
 					current_family)  # moved check down here. Prevents checking already processed families
@@ -400,6 +404,11 @@ def process_family():
 					if "DataMonster" in str(item):  # again ignore non DataMonster templates, like enchants
 						process_page(current_family, item, section)
 						made_changes = True
+				if made_changes:
+					sections_list.append({"name": section, "id": current_section_id})
+
+		if AUTO_UPLOAD and made_changes:
+			BOT_OBJ.update_family_to_semantic(current_family, sections_list)
 
 		if AUTO_UPLOAD and made_changes:
 			input("Finished family [{0}]. Waiting for user".format(current_family))
@@ -553,7 +562,7 @@ def ask_auto_upload():
 
 
 def main():
-	ask_auto_move()
+	# ask_auto_move()
 	ask_auto_upload()
 	process_family()
 
