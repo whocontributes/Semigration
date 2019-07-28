@@ -325,7 +325,10 @@ def process_common_params(wikicode, monster_type, section, current_family):
 	for key, value in gold_to_push.items():
 		wikicode.add(key, value)
 
-	wikicode.add("Type", monster_type + "\n")
+	if monster_type == "GM":
+		wikicode.add("Type", "Shadow\n")
+	else:
+		wikicode.add("Type", monster_type + "\n")
 	wikicode.add("Section", section + "\n")
 	wikicode.add("Skills", ",".join(skills_list))
 
@@ -377,7 +380,7 @@ def write_files(current_monster_name, ready_wikicode):
 def process_family():
 	global warning_text
 	# for each family, get the templates used.
-	for current_family in FAMILY_PAGES_LIST:
+	for i, current_family in enumerate(FAMILY_PAGES_LIST):
 		made_changes = False
 		# Bot.check_matching_name(current_family)
 		current_page = semigration.parse(current_family)
@@ -411,11 +414,13 @@ def process_family():
 			BOT_OBJ.update_family_to_semantic(current_family, sections_list)
 
 		if AUTO_UPLOAD and made_changes:
-			input("Finished family [{0}]. Waiting for user".format(current_family))
+			input("Finished family [{0}].({1}/{2}) Waiting for user".format(current_family, i, len(FAMILY_PAGES_LIST)))
 
 
 def process_page(current_family, item, section):
 	monster_type = "Normal"
+	if 'format' not in item:
+		item['format'] = item['1']
 	if "StyleShadowMonster" in str(item['format']):
 		monster_type = "Shadow"
 	elif "StyleLordMonster" in str(item['format']):
@@ -451,6 +456,9 @@ def process_page(current_family, item, section):
 	elif "Alban" in str(current_data_monster_templates_list):
 		print("[WARNING] Alban monster detected. Please confirm output.")
 		monster_type = "Alban"
+	elif monster_type == "Shadow" and "[[Grandmaster Mission]]" in str(current_data_monster_templates_list):
+		print("[WARNING] GM monster detected. Please confirm output.")
+		monster_type = "GM"
 
 	param_done_wikicode = ""
 	indexes_to_delete = []
