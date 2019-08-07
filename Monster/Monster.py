@@ -198,14 +198,7 @@ def try_get_file_ext(monster_name):
 
 
 ###############
-# Processes the parameters,
-# Page-> Family,
-# Skills,
-# CP,
-# Capitals,
-# FieldBox or Mainstream
-# Aggro -> true or false
-# Element: Unknown -> empty string
+# Processes the parameters that are common to all
 ###############
 def process_common_params(wikicode, monster_type, section, current_family):
 	global warning_text
@@ -243,6 +236,10 @@ def process_common_params(wikicode, monster_type, section, current_family):
 			# param = mwparserfromhell.parse(param.replace("Page", "Family"))
 			param.name = "Family"
 			param.value = current_family + "\n"
+		elif "PartyHeal" in param.name:
+			skills_list.append("Party Healing")
+			params_to_remove.append(param)
+			warning_text = warning_text + "'''When importing data, partyHeal was found'''<br>"
 		elif "Skill" in param.name and ("AdvancedHeavyStander" in param.name or not any(
 				name in param.name for name in SKILL_BLACKLIST)):  # push skills into a list
 			if param.value.strip().lower() == "y":
@@ -331,6 +328,8 @@ def process_common_params(wikicode, monster_type, section, current_family):
 		wikicode.add("Type", monster_type + "\n")
 	wikicode.add("Section", section + "\n")
 	wikicode.add("Skills", ",".join(skills_list))
+	if len(skills_list) ==0:
+		warning_text = warning_text + "''Skill list is empty'''<br>"
 
 	return wikicode
 
@@ -377,6 +376,30 @@ def write_files(current_monster_name, ready_wikicode):
 	print("Wrote to file")
 
 
+def process_family_gm():
+	from Monster_Globals import GM_LIST
+	global warning_text
+	current_section_id = 0  # replace entire page
+	section = ""
+	# for each family, get the templates used.
+	for i, current_family in enumerate(GM_LIST):
+		made_changes = False
+		# Bot.check_matching_name(current_family)
+		current_page = semigration.parse(current_family)
+		sections_list = []
+		if "DataMonster" in str(current_page.templates):  # ignore sections without DataMonster "general information"
+			for item in current_page.templates:
+				warning_text = ""  # reset before process monster
+
+				if "DataMonster" in str(item):  # again ignore non DataMonster templates, like enchants
+					find_type_gm(current_family, item, section)
+					made_changes = True
+
+		if AUTO_UPLOAD and made_changes:
+			print("Finished family [{0}].({1}/{2})".format(current_family, i, len(GM_LIST)))
+			input("Waiting for user")
+
+
 def process_family():
 	global warning_text
 	# for each family, get the templates used.
@@ -405,7 +428,7 @@ def process_family():
 					warning_text = ""  # reset before process monster
 
 					if "DataMonster" in str(item):  # again ignore non DataMonster templates, like enchants
-						process_page(current_family, item, section)
+						find_type(current_family, item, section)
 						made_changes = True
 				if made_changes:
 					sections_list.append({"name": section, "id": current_section_id})
@@ -417,7 +440,18 @@ def process_family():
 			input("Finished family [{0}].({1}/{2}) Waiting for user".format(current_family, i, len(FAMILY_PAGES_LIST)))
 
 
-def process_page(current_family, item, section):
+def find_type_gm(current_family, item, section):
+	monster_type = "GM"
+	if "{{PAGENAME}}" in str(item.name):
+		item.name = str(item.name).replace("{{PAGENAME}}", current_family)
+	current_monster_name = str(item.name).replace("DataMonster", "")
+
+	current_data_monster_templates_list = extract_templates("Template:" + str(item.name))
+
+	process_page(current_data_monster_templates_list, monster_type, section, current_family, current_monster_name)
+
+
+def find_type(current_family, item, section):
 	monster_type = "Normal"
 	if 'format' not in item:
 		item['format'] = item['1']
@@ -460,6 +494,10 @@ def process_page(current_family, item, section):
 		print("[WARNING] GM monster detected. Please confirm output.")
 		monster_type = "GM"
 
+	process_page(current_data_monster_templates_list, monster_type, section, current_family, current_monster_name)
+
+
+def process_page(current_data_monster_templates_list, monster_type, section, current_family, current_monster_name):
 	param_done_wikicode = ""
 	indexes_to_delete = []
 	# Now we search for the {{{format}}} template
@@ -573,6 +611,7 @@ def main():
 	# ask_auto_move()
 	ask_auto_upload()
 	process_family()
+	# process_family_gm()
 
 
 # upload_listdir("output")
