@@ -121,6 +121,8 @@ def make_monster_difficulty(wikicode, monster_type):
 		wikicode, difficulty_template = process_params_shadow(wikicode)
 	elif monster_type == "GM":
 		wikicode, difficulty_template = process_params_gm(wikicode)
+	elif monster_type == "Raid":
+		wikicode, difficulty_template = process_params_raid(wikicode)
 	elif monster_type == "Lord":
 		wikicode, difficulty_template = process_params_lords(wikicode)
 	elif monster_type == "Baltane":
@@ -218,6 +220,39 @@ def process_params_gm(wikicode):
 	difficulty_total = difficulty_total + str(difficulty_template) + "<nowiki/>\n"
 	return wikicode, difficulty_total
 
+def process_params_raid(wikicode):
+	wikicode.add("MissionsList", try_or(lambda: wikicode.get("Raid Dungeon").value, "\n"))
+	try_or(lambda: wikicode.remove("Raid Dungeon"), "")
+
+	difficulty_total = ""
+	params_list = wikicode.params
+
+	params_list = rename_params(params_list)
+	difficulty_template = mwparserfromhell.parse("{{SemanticMonsterDifficultyData\n}}").filter_templates()[0]
+
+
+	# first, move all values to difficulty_template
+	difficulty_template.add("HP", try_or(lambda: wikicode.get("HP").value, "\n"))
+	difficulty_template.add("Defense", try_or(lambda: wikicode.get("Defense").value, "\n"))
+	difficulty_template.add("CP", try_or(lambda: wikicode.get("CP").value, "\n"))
+	difficulty_template.add("Protection", try_or(lambda: wikicode.get("Protection").value, "\n"))
+	difficulty_template.add("MeleeDamage", try_or(lambda: wikicode.get("MeleeDamage").value, "\n"))
+	difficulty_template.add("RangedDamage", try_or(lambda: wikicode.get("RangedDamage").value, "\n"))
+
+	difficulty_template.add("Crit", try_or(lambda: wikicode.get("Crit").value, "\n"))
+	difficulty_template.add("EXP",  try_or(lambda: wikicode.get("EXP").value, "\n"))
+	difficulty_template.add("GoldMin", try_or(lambda: wikicode.get("GoldMin").value, "\n"))
+	difficulty_template.add("GoldMax", try_or(lambda: wikicode.get("GoldMax").value, "\n"))
+	difficulty_template.add("DropEquip", try_or(lambda: wikicode.get("DropEquip").value, "\n"))
+	difficulty_template.add("DropMisc", try_or(lambda: wikicode.get("DropMisc").value, "\n"))
+
+	# Then remove original values
+	wikicode = remove_original(wikicode)
+
+	difficulty_template = cleanup(difficulty_template)
+
+	difficulty_total = difficulty_total + str(difficulty_template) + "<nowiki/>\n"
+	return wikicode, difficulty_total
 
 ###############
 # Manually adds data for {{SemanticMonsterDifficultyData template for lords shadow monsters
