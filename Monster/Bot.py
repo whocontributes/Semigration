@@ -12,11 +12,11 @@ class Bot(object):
 		self.session.login(USERNAME, PASSWORD)
 		print("[BOT] Successfully logged in")
 
-	def edit_and_save(self, page_name, wikitext):
+	def edit_and_save(self, page_name, wikitext, summary='Semanticfied monster. Please check my work!'):
 		page = self.session.Pages[page_name]
 
-		page.save(str(wikitext), summary='Semanticfied monster. Please check my work!')
-		print("[BOT] Saved monster %s. Sleeping for 5 seconds\n===\n" % page_name)
+		page.save(str(wikitext), summary=summary)
+		print("[BOT] Saved monster %s. Sleeping for 5 seconds" % page_name)
 		time.sleep(5)
 		page.purge()
 
@@ -25,7 +25,7 @@ class Bot(object):
 		new_page = self.session.Pages[page_name + " (Family)"]
 
 		new_page.save(old_page.text(), summary='Moved to family page before processing monsters')
-		print("[BOT] Moved to new family page. %s Sleeping for 5 seconds\n===\n" % (page_name + " (Family)"))
+		print("[BOT] Moved to new family page. %s Sleeping for 5 seconds" % (page_name + " (Family)"))
 		time.sleep(5)
 
 	###############
